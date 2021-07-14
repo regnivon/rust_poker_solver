@@ -156,8 +156,7 @@ impl Game {
         } else if call_stacks == 0.0 {
             let next = AllInShowdownNode::new(root.pot_size + last_bet_size, street);
             root.add_child(Node::from(next));
-        }
-        else {
+        } else {
             let mut next = if self.game_params.parallel_street == street {
                 ChanceNode::new(board, street, true)
             } else {
@@ -170,17 +169,16 @@ impl Game {
                 let mut new_board = *board;
                 if street == 1 {
                     new_board[3] = card;
-                }
-                else {
+                } else {
                     new_board[4] = card;
                 }
 
                 let mut next_game_node = ActionNode::new(
                     0,
-                    self.traversal
-                        .get_num_hands_for_player(0, &new_board),
+                    self.traversal.get_num_hands_for_player(0, &new_board),
                     root.pot_size + last_bet_size,
-                    call_stacks, call_stacks
+                    call_stacks,
+                    call_stacks,
                 );
 
                 self.add_successor_nodes(&mut next_game_node, 0, &new_board);

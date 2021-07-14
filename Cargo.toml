@@ -8,6 +8,10 @@ edition = "2018"
 [profile.release]
 lto = "fat"
 codegen-units=1
+debug = 1
+
+[rust]
+debuginfo-level = 1
 
 [net]
 git-fetch-with-cli = true

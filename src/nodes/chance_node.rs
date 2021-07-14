@@ -1,4 +1,6 @@
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator};
+use rayon::iter::{
+    IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator,
+};
 
 use crate::{
     cfr::traversal::Traversal,
@@ -22,16 +24,19 @@ impl CfrNode for ChanceNode {
         board: &Board,
     ) -> Vec<f64> {
         let mut result = vec![0.0; traversal.get_num_hands_for_traverser(board)];
-        let next_boards: Vec<Board> = self.next_cards.iter().map(|c| {
-            let mut b = *board;
-            if self.street == 1 {
-                b[3] = *c;
-            }
-            else {
-                b[4] = *c;
-            }
-            b
-        }).collect();
+        let next_boards: Vec<Board> = self
+            .next_cards
+            .iter()
+            .map(|c| {
+                let mut b = *board;
+                if self.street == 1 {
+                    b[3] = *c;
+                } else {
+                    b[4] = *c;
+                }
+                b
+            })
+            .collect();
 
         let sub_results: Vec<Vec<f64>> = if self.parallel {
             self.next_nodes
@@ -64,18 +69,17 @@ impl CfrNode for ChanceNode {
                 result[hand] += sub_results[i][hand];
             }
         }
-    
+
         if self.street == 1 {
             for hand in result.iter_mut() {
                 *hand /= 45.0
             }
-        }
-        else {
+        } else {
             for hand in result.iter_mut() {
                 *hand /= 44.0
             }
         }
-    
+
         result
     }
 
@@ -87,19 +91,23 @@ impl CfrNode for ChanceNode {
     ) -> Vec<f64> {
         let mut sub_results = vec![];
         let mut result = vec![0.0; traversal.get_num_hands_for_traverser(board)];
-        let next_boards: Vec<Board> = self.next_cards.iter().map(|c| {
-            let mut b = *board;
-            if self.street == 1 {
-                b[3] = *c;
-            }
-            else {
-                b[4] = *c;
-            }
-            b
-        }).collect();
+        let next_boards: Vec<Board> = self
+            .next_cards
+            .iter()
+            .map(|c| {
+                let mut b = *board;
+                if self.street == 1 {
+                    b[3] = *c;
+                } else {
+                    b[4] = *c;
+                }
+                b
+            })
+            .collect();
 
         if self.parallel {
-            sub_results = self.next_nodes
+            sub_results = self
+                .next_nodes
                 .par_iter()
                 .zip(next_boards.par_iter())
                 .map(|(node, new_board)| {
@@ -111,7 +119,8 @@ impl CfrNode for ChanceNode {
                 })
                 .collect()
         } else {
-            sub_results = self.next_nodes
+            sub_results = self
+                .next_nodes
                 .iter()
                 .zip(next_boards.iter())
                 .map(|(node, new_board)| {
@@ -129,18 +138,17 @@ impl CfrNode for ChanceNode {
                 result[hand] += sub_results[i][hand];
             }
         }
-    
+
         if self.street == 1 {
             for hand in result.iter_mut() {
                 *hand /= 45.0
             }
-        }
-        else {
+        } else {
             for hand in result.iter_mut() {
                 *hand /= 44.0
             }
         }
-    
+
         result
     }
 }

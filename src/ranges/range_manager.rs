@@ -237,9 +237,8 @@ impl RangeManager {
                 continue;
             }
 
-            let river_hand = board_hand
-                + CARDS[usize::from(hand.hand[0])]
-                + CARDS[usize::from(hand.hand[1])];
+            let river_hand =
+                board_hand + CARDS[usize::from(hand.hand[0])] + CARDS[usize::from(hand.hand[1])];
 
             river_hands.push(Combination::new(
                 hand.hand,
@@ -262,11 +261,11 @@ impl RangeManager {
         self.ranges.get(&board_key).unwrap()
     }
 
-    pub fn get_next_reach_probs(&self, new_board: &Board, opp_reach_probs: &Vec<f64>) -> Vec<f64>{
+    pub fn get_next_reach_probs(&self, new_board: &Board, opp_reach_probs: &Vec<f64>) -> Vec<f64> {
         let board_key = get_key(new_board);
-        let map= &self.reach_probs_mapping[&board_key];
+        let map = &self.reach_probs_mapping[&board_key];
 
-        let mut new_reach_probs = vec![0.0; opp_reach_probs.len()];
+        let mut new_reach_probs = vec![0.0; map.len()];
 
         for i in 0..map.len() {
             new_reach_probs[i] = opp_reach_probs[map[i]];
@@ -275,9 +274,14 @@ impl RangeManager {
         new_reach_probs
     }
 
-    pub fn map_utility_backwards(&self, new_board: &Board, utility: &Vec<f64>, mapped_utility: &mut Vec<f64>) {
+    pub fn map_utility_backwards(
+        &self,
+        new_board: &Board,
+        utility: &Vec<f64>,
+        mapped_utility: &mut Vec<f64>,
+    ) {
         let board_key = get_key(new_board);
-        let map= &self.reach_probs_mapping[&board_key];
+        let map = &self.reach_probs_mapping[&board_key];
 
         for i in 0..utility.len() {
             mapped_utility[map[i]] += utility[i];
