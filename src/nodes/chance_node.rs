@@ -10,7 +10,7 @@ use super::node::{CfrNode, Node};
 pub struct ChanceNode {
     street: u8,
     next_nodes: Vec<Node>,
-    next_cards: Vec<u8>,
+    pub next_cards: Vec<u8>,
     parallel: bool,
 }
 
@@ -21,7 +21,6 @@ impl CfrNode for ChanceNode {
         op_reach_prob: &Vec<f64>,
         board: &Board,
     ) -> Vec<f64> {
-        let mut sub_results = vec![];
         let mut result = vec![0.0; traversal.get_num_hands_for_traverser(board)];
         let next_boards: Vec<Board> = self.next_cards.iter().map(|c| {
             let mut b = *board;
@@ -34,35 +33,31 @@ impl CfrNode for ChanceNode {
             b
         }).collect();
 
-        if self.parallel {
-            sub_results = self.next_nodes
+        let sub_results: Vec<Vec<f64>> = if self.parallel {
+            self.next_nodes
                 .par_iter_mut()
                 .zip(next_boards.par_iter())
                 .map(|(node, new_board)| {
-                    /*
-                    auto nextOpp = traversal->rm->getReachProbs(traversal->traverser, newBoard, opponentReachProb);
-
-            auto utility = nextNodes[i]->CFRTraversal(traversal, nextOpp, newBoard);
-
-            std::vector<float> mappedUtility(result.size());
-                    */
                     let next_probs = traversal.get_next_reach_probs(new_board, op_reach_prob);
                     let utility = node.cfr_traversal(traversal, &next_probs, new_board);
-                    let mapped_utility = vec![0.0; result.len()];
-                    
+                    let mut mapped_utility = vec![0.0; result.len()];
+                    traversal.map_utility_backwards(new_board, &utility, &mut mapped_utility);
                     mapped_utility
                 })
                 .collect()
         } else {
-            sub_results = self.next_nodes
+            self.next_nodes
                 .iter_mut()
                 .zip(next_boards.iter())
                 .map(|(node, new_board)| {
-                    
-                    node.cfr_traversal(traversal, op_reach_prob, new_board)
+                    let next_probs = traversal.get_next_reach_probs(new_board, op_reach_prob);
+                    let utility = node.cfr_traversal(traversal, &next_probs, new_board);
+                    let mut mapped_utility = vec![0.0; result.len()];
+                    traversal.map_utility_backwards(new_board, &utility, &mut mapped_utility);
+                    mapped_utility
                 })
                 .collect()
-        }
+        };
 
         for i in 0..sub_results.len() {
             for hand in 0..result.len() {
@@ -86,11 +81,67 @@ impl CfrNode for ChanceNode {
 
     fn best_response(
         &self,
-        _traversal: &Traversal,
-        _op_reach_prob: &Vec<f64>,
-        _board: &Board,
+        traversal: &Traversal,
+        op_reach_prob: &Vec<f64>,
+        board: &Board,
     ) -> Vec<f64> {
-        todo!("Not Implemented")
+        let mut sub_results = vec![];
+        let mut result = vec![0.0; traversal.get_num_hands_for_traverser(board)];
+        let next_boards: Vec<Board> = self.next_cards.iter().map(|c| {
+            let mut b = *board;
+            if self.street == 1 {
+                b[3] = *c;
+            }
+            else {
+                b[4] = *c;
+            }
+            b
+        }).collect();
+
+        if self.parallel {
+            sub_results = self.next_nodes
+                .par_iter()
+                .zip(next_boards.par_iter())
+                .map(|(node, new_board)| {
+                    let next_probs = traversal.get_next_reach_probs(new_board, op_reach_prob);
+                    let utility = node.best_response(traversal, &next_probs, new_board);
+                    let mut mapped_utility = vec![0.0; result.len()];
+                    traversal.map_utility_backwards(new_board, &utility, &mut mapped_utility);
+                    mapped_utility
+                })
+                .collect()
+        } else {
+            sub_results = self.next_nodes
+                .iter()
+                .zip(next_boards.iter())
+                .map(|(node, new_board)| {
+                    let next_probs = traversal.get_next_reach_probs(new_board, op_reach_prob);
+                    let utility = node.best_response(traversal, &next_probs, new_board);
+                    let mut mapped_utility = vec![0.0; result.len()];
+                    traversal.map_utility_backwards(new_board, &utility, &mut mapped_utility);
+                    mapped_utility
+                })
+                .collect()
+        }
+
+        for i in 0..sub_results.len() {
+            for hand in 0..result.len() {
+                result[hand] += sub_results[i][hand];
+            }
+        }
+    
+        if self.street == 1 {
+            for hand in result.iter_mut() {
+                *hand /= 45.0
+            }
+        }
+        else {
+            for hand in result.iter_mut() {
+                *hand /= 44.0
+            }
+        }
+    
+        result
     }
 }
 

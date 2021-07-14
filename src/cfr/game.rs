@@ -1,3 +1,5 @@
+use crate::nodes::all_in_showdown_node::AllInShowdownNode;
+use crate::nodes::chance_node::ChanceNode;
 use crate::nodes::node::CfrNode;
 
 use crate::ranges::utility::range_relative_probabilities;
@@ -109,13 +111,6 @@ impl Game {
             self.game_params.starting_stack,
             self.game_params.starting_stack,
         );
-        if self.starting_board[3] == 52 {
-            self.game_params.parallel_street = 1;
-        } else if self.starting_board[4] == 52 {
-            self.game_params.parallel_street = 2;
-        } else {
-            self.game_params.parallel_street = 3;
-        }
 
         let board = self.starting_board;
 
@@ -150,16 +145,49 @@ impl Game {
         root: &mut ActionNode,
         bet_number: u8,
         street: u8,
-        _board: &Board,
+        board: &Board,
     ) {
         let last_bet_size = (root.ip_stack - root.oop_stack).abs();
-        let _call_stacks = root.ip_stack.min(root.oop_stack);
+        let call_stacks = root.ip_stack.min(root.oop_stack);
 
         if street == 3 {
             let next = ShowdownNode::new(root.pot_size + last_bet_size);
             root.add_child(Node::from(next));
-        } else {
-            todo!("Implement this past river");
+        } else if call_stacks == 0.0 {
+            let next = AllInShowdownNode::new(root.pot_size + last_bet_size, street);
+            root.add_child(Node::from(next));
+        }
+        else {
+            let mut next = if self.game_params.parallel_street == street {
+                ChanceNode::new(board, street, true)
+            } else {
+                ChanceNode::new(board, street, false)
+            };
+
+            let next_cards = next.next_cards.clone();
+
+            for card in next_cards {
+                let mut new_board = *board;
+                if street == 1 {
+                    new_board[3] = card;
+                }
+                else {
+                    new_board[4] = card;
+                }
+
+                let mut next_game_node = ActionNode::new(
+                    0,
+                    self.traversal
+                        .get_num_hands_for_player(0, &new_board),
+                    root.pot_size + last_bet_size,
+                    call_stacks, call_stacks
+                );
+
+                self.add_successor_nodes(&mut next_game_node, 0, &new_board);
+                next.add_next_node(Node::from(next_game_node));
+            }
+
+            root.add_child(Node::from(next));
         }
 
         if bet_number > 0 {

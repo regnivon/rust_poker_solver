@@ -54,7 +54,10 @@ impl Traversal {
         self.ip_rm.get_next_reach_probs(new_board, opp_reach_probs)
     }
 
-    pub fn map_utility_backwards(&self, new_board: &Board, utility: &Vec<f64>, mapped_utility: &Vec<f64>) {
-        
+    pub fn map_utility_backwards(&self, new_board: &Board, utility: &Vec<f64>, mapped_utility: &mut Vec<f64>) {
+        if self.traverser == 1 {
+            return self.oop_rm.map_utility_backwards(new_board, utility, mapped_utility);
+        }
+        self.ip_rm.map_utility_backwards(new_board, utility, mapped_utility)
     }
 }
