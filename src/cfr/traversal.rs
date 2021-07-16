@@ -47,7 +47,7 @@ impl Traversal {
         self.oop_rm.get_range_for_board(board).len()
     }
 
-    pub fn get_next_reach_probs(&self, new_board: &Board, opp_reach_probs: &Vec<f64>) -> Vec<f64> {
+    pub fn get_next_reach_probs(&self, new_board: &Board, opp_reach_probs: &[f32]) -> Vec<f32> {
         if self.traverser == 1 {
             return self.oop_rm.get_next_reach_probs(new_board, opp_reach_probs);
         }
@@ -57,8 +57,8 @@ impl Traversal {
     pub fn map_utility_backwards(
         &self,
         new_board: &Board,
-        utility: &Vec<f64>,
-        mapped_utility: &mut Vec<f64>,
+        utility: &[f32],
+        mapped_utility: &mut Vec<f32>,
     ) {
         if self.traverser == 1 {
             return self

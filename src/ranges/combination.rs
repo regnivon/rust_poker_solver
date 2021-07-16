@@ -2,17 +2,17 @@ use std::cmp::Ordering;
 
 pub type Hand = [u8; 2];
 pub type Board = [u8; 5];
-pub type Range = Vec<Combination>;
+pub type Range = [Combination];
 
 #[derive(Clone, Copy, Debug)]
 pub struct Combination {
     pub hand: Hand,
     pub rank: u16,
-    pub combos: f64,
+    pub combos: f32,
 }
 
 impl Combination {
-    pub fn new(hand: Hand, rank: u16, combos: f64) -> Self {
+    pub fn new(hand: Hand, rank: u16, combos: f32) -> Self {
         Combination { hand, rank, combos }
     }
 }

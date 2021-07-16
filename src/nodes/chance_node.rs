@@ -20,9 +20,9 @@ impl CfrNode for ChanceNode {
     fn cfr_traversal(
         &mut self,
         traversal: &Traversal,
-        op_reach_prob: &Vec<f64>,
+        op_reach_prob: &[f32],
         board: &Board,
-    ) -> Vec<f64> {
+    ) -> Vec<f32> {
         let mut result = vec![0.0; traversal.get_num_hands_for_traverser(board)];
         let next_boards: Vec<Board> = self
             .next_cards
@@ -38,7 +38,7 @@ impl CfrNode for ChanceNode {
             })
             .collect();
 
-        let sub_results: Vec<Vec<f64>> = if self.parallel {
+        let sub_results: Vec<Vec<f32>> = if self.parallel {
             self.next_nodes
                 .par_iter_mut()
                 .zip(next_boards.par_iter())
@@ -64,9 +64,9 @@ impl CfrNode for ChanceNode {
                 .collect()
         };
 
-        for i in 0..sub_results.len() {
-            for hand in 0..result.len() {
-                result[hand] += sub_results[i][hand];
+        for runout in sub_results {
+            for (hand, val) in result.iter_mut().enumerate() {
+                *val += runout[hand]
             }
         }
 
@@ -86,9 +86,9 @@ impl CfrNode for ChanceNode {
     fn best_response(
         &self,
         traversal: &Traversal,
-        op_reach_prob: &Vec<f64>,
+        op_reach_prob: &[f32],
         board: &Board,
-    ) -> Vec<f64> {
+    ) -> Vec<f32> {
         let mut result = vec![0.0; traversal.get_num_hands_for_traverser(board)];
         let next_boards: Vec<Board> = self
             .next_cards
@@ -104,7 +104,7 @@ impl CfrNode for ChanceNode {
             })
             .collect();
 
-        let sub_results: Vec<Vec<f64>> = if self.parallel {
+        let sub_results: Vec<Vec<f32>> = if self.parallel {
             self.next_nodes
                 .par_iter()
                 .zip(next_boards.par_iter())
@@ -130,9 +130,9 @@ impl CfrNode for ChanceNode {
                 .collect()
         };
 
-        for i in 0..sub_results.len() {
-            for hand in 0..result.len() {
-                result[hand] += sub_results[i][hand];
+        for runout in sub_results {
+            for (hand, val) in result.iter_mut().enumerate() {
+                *val += runout[hand]
             }
         }
 

@@ -6,21 +6,21 @@ pub struct ActionNode {
     pub player_node: u8,
     num_hands: usize,
     num_actions: usize,
-    pub pot_size: f64,
-    pub ip_stack: f64,
-    pub oop_stack: f64,
+    pub pot_size: f32,
+    pub ip_stack: f32,
+    pub oop_stack: f32,
     next_nodes: Vec<Node>,
-    regret_accumulator: Vec<f64>,
-    strategy_accumulator: Vec<f64>,
+    regret_accumulator: Vec<f32>,
+    strategy_accumulator: Vec<f32>,
 }
 
 impl CfrNode for ActionNode {
     fn cfr_traversal(
         &mut self,
         traversal: &Traversal,
-        op_reach_prob: &Vec<f64>,
+        op_reach_prob: &[f32],
         board: &Board,
-    ) -> Vec<f64> {
+    ) -> Vec<f32> {
         let mut node_utility = vec![0.0; traversal.get_num_hands_for_traverser(board)];
         if traversal.traverser == self.player_node {
             self.traverser_cfr(traversal, op_reach_prob, &mut node_utility, board)
@@ -33,9 +33,9 @@ impl CfrNode for ActionNode {
     fn best_response(
         &self,
         traversal: &Traversal,
-        op_reach_prob: &Vec<f64>,
+        op_reach_prob: &[f32],
         board: &Board,
-    ) -> Vec<f64> {
+    ) -> Vec<f32> {
         if self.player_node == traversal.traverser {
             let mut best_ev = vec![0.0; self.num_hands];
             for action in 0..self.num_actions {
@@ -73,9 +73,9 @@ impl ActionNode {
     pub fn new(
         player_node: u8,
         num_hands: usize,
-        pot_size: f64,
-        ip_stack: f64,
-        oop_stack: f64,
+        pot_size: f32,
+        ip_stack: f32,
+        oop_stack: f32,
     ) -> Self {
         Self {
             player_node,
@@ -100,11 +100,11 @@ impl ActionNode {
         self.next_nodes.push(child);
     }
 
-    fn get_strategy(&self) -> Vec<f64> {
+    fn get_strategy(&self) -> Vec<f32> {
         let nums = self.num_actions * self.num_hands;
         let mut strategy = vec![0.0; nums];
 
-        let probability = 1.0 / (self.num_actions as f64);
+        let probability = 1.0 / (self.num_actions as f32);
 
         for hand in 0..self.num_hands {
             let mut normalizing_value = 0.0;
@@ -131,7 +131,7 @@ impl ActionNode {
         strategy
     }
 
-    fn get_average_strategy(&self) -> Vec<f64> {
+    fn get_average_strategy(&self) -> Vec<f32> {
         let nums = self.num_actions * self.num_hands;
         let mut average_strategy = vec![0.0; nums];
 
@@ -148,7 +148,7 @@ impl ActionNode {
                         / normalizing_value;
                 }
             } else {
-                let probability = 1.0 / (self.num_actions as f64);
+                let probability = 1.0 / (self.num_actions as f32);
                 for action in 0..self.num_actions {
                     average_strategy[hand + action * self.num_hands] = probability;
                 }
@@ -161,8 +161,8 @@ impl ActionNode {
     fn regret_sum_update(
         &mut self,
         traversal: &Traversal,
-        action_utility: &Vec<f64>,
-        node_utility: &Vec<f64>,
+        action_utility: &[f32],
+        node_utility: &[f32],
     ) {
         let alpha = f64::from(traversal.iteration).powf(1.5);
         let positive_multiplier = alpha / (alpha + 1.0);
@@ -174,7 +174,7 @@ impl ActionNode {
                 self.regret_accumulator[hand + offset] +=
                     action_utility[hand + offset] - node_utility[hand];
                 if self.regret_accumulator[hand + offset] > 0.0 {
-                    self.regret_accumulator[hand + offset] *= positive_multiplier;
+                    self.regret_accumulator[hand + offset] *= positive_multiplier as f32;
                 } else {
                     self.regret_accumulator[hand + offset] *= negative_multiplier;
                 }
@@ -185,8 +185,8 @@ impl ActionNode {
     fn strategy_sum_update(
         &mut self,
         traversal: &Traversal,
-        op_reach_prob: &Vec<f64>,
-        strategies: &Vec<f64>,
+        op_reach_prob: &[f32],
+        strategies: &[f32],
     ) {
         let strategy_multiplier =
             (f64::from(traversal.iteration) / f64::from(traversal.iteration + 1)).powi(2);
@@ -196,7 +196,8 @@ impl ActionNode {
                 self.strategy_accumulator[hand + action * self.num_hands] *= 0.9;
                 self.strategy_accumulator[hand + action * self.num_hands] +=
                     op_reach_prob[hand] * strategies[hand + action * self.num_hands];
-                self.strategy_accumulator[hand + action * self.num_hands] *= strategy_multiplier;
+                self.strategy_accumulator[hand + action * self.num_hands] *=
+                    strategy_multiplier as f32;
             }
         }
     }
@@ -204,8 +205,8 @@ impl ActionNode {
     fn traverser_cfr(
         &mut self,
         traversal: &Traversal,
-        op_reach_prob: &Vec<f64>,
-        node_utility: &mut Vec<f64>,
+        op_reach_prob: &[f32],
+        node_utility: &mut Vec<f32>,
         board: &Board,
     ) {
         let mut action_utility = vec![0.0; self.num_actions * self.num_hands];
@@ -215,8 +216,10 @@ impl ActionNode {
             let action_offset = i * self.num_hands;
 
             let result = self.next_nodes[i].cfr_traversal(traversal, op_reach_prob, board);
+
+            action_utility[action_offset..(node_utility.len() + action_offset)].clone_from_slice(&result[..node_utility.len()]);
+
             for hand in 0..node_utility.len() {
-                action_utility[hand + action_offset] = result[hand];
                 node_utility[hand] += strategies[hand + action_offset] * result[hand];
             }
         }
@@ -227,8 +230,8 @@ impl ActionNode {
     fn opponent_cfr(
         &mut self,
         traversal: &Traversal,
-        op_reach_prob: &Vec<f64>,
-        node_utility: &mut Vec<f64>,
+        op_reach_prob: &[f32],
+        node_utility: &mut Vec<f32>,
         board: &Board,
     ) {
         let strategies = self.get_strategy();

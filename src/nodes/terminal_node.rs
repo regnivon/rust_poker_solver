@@ -6,7 +6,7 @@ use crate::{
 use super::node::CfrNode;
 
 pub struct TerminalNode {
-    win_utility: f64,
+    win_utility: f32,
     player_node: u8,
 }
 
@@ -14,24 +14,24 @@ impl CfrNode for TerminalNode {
     fn cfr_traversal(
         &mut self,
         traversal: &Traversal,
-        op_reach_prob: &Vec<f64>,
+        op_reach_prob: &[f32],
         board: &Board,
-    ) -> Vec<f64> {
+    ) -> Vec<f32> {
         self.dispatch_utility(traversal, op_reach_prob, board)
     }
 
     fn best_response(
         &self,
         traversal: &Traversal,
-        op_reach_prob: &Vec<f64>,
+        op_reach_prob: &[f32],
         board: &Board,
-    ) -> Vec<f64> {
+    ) -> Vec<f32> {
         self.dispatch_utility(traversal, op_reach_prob, board)
     }
 }
 
 impl TerminalNode {
-    pub fn new(pot_size: f64, player_node: u8) -> Self {
+    pub fn new(pot_size: f32, player_node: u8) -> Self {
         Self {
             win_utility: pot_size / 2.0,
             player_node,
@@ -41,9 +41,9 @@ impl TerminalNode {
     fn dispatch_utility(
         &self,
         traversal: &Traversal,
-        op_reach_prob: &Vec<f64>,
+        op_reach_prob: &[f32],
         board: &Board,
-    ) -> Vec<f64> {
+    ) -> Vec<f32> {
         let traverser_hands = traversal.get_range_for_active_player(board);
         let opp_hands = traversal.get_range_for_opponent(board);
 
@@ -58,11 +58,11 @@ impl TerminalNode {
 
     fn traverser_utility(
         &self,
-        win_utility: f64,
-        op_reach_prob: &Vec<f64>,
-        traverser_hands: &Vec<Combination>,
-        opp_hands: &Vec<Combination>,
-    ) -> Vec<f64> {
+        win_utility: f32,
+        op_reach_prob: &[f32],
+        traverser_hands: &[Combination],
+        opp_hands: &[Combination],
+    ) -> Vec<f32> {
         let num_hands = traverser_hands.len();
 
         let mut utility = vec![0.0; num_hands];

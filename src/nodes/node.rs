@@ -14,15 +14,15 @@ pub trait CfrNode {
     fn cfr_traversal(
         &mut self,
         traversal: &Traversal,
-        op_reach_prob: &Vec<f64>,
+        op_reach_prob: &[f32],
         board: &Board,
-    ) -> Vec<f64>;
+    ) -> Vec<f32>;
     fn best_response(
         &self,
         traversal: &Traversal,
-        op_reach_prob: &Vec<f64>,
+        op_reach_prob: &[f32],
         board: &Board,
-    ) -> Vec<f64>;
+    ) -> Vec<f32>;
 }
 
 #[enum_dispatch(CfrNode)]

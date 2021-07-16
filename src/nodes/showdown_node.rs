@@ -5,7 +5,7 @@ use crate::{
 
 use super::node::CfrNode;
 
-pub fn showdown(hands: &Range, op_reach_prob: &Vec<f64>, win_utility: f64) -> Vec<f64> {
+pub fn showdown(hands: &Range, op_reach_prob: &[f32], win_utility: f32) -> Vec<f32> {
     let mut sum = 0.0;
     let num_hands = hands.len();
 
@@ -53,16 +53,16 @@ pub fn showdown(hands: &Range, op_reach_prob: &Vec<f64>, win_utility: f64) -> Ve
 }
 
 pub struct ShowdownNode {
-    win_utility: f64,
+    win_utility: f32,
 }
 
 impl CfrNode for ShowdownNode {
     fn cfr_traversal(
         &mut self,
         traversal: &Traversal,
-        op_reach_prob: &Vec<f64>,
+        op_reach_prob: &[f32],
         board: &Board,
-    ) -> Vec<f64> {
+    ) -> Vec<f32> {
         let opp_hands = traversal.get_range_for_opponent(board);
         showdown(opp_hands, op_reach_prob, self.win_utility)
     }
@@ -70,16 +70,16 @@ impl CfrNode for ShowdownNode {
     fn best_response(
         &self,
         traversal: &Traversal,
-        op_reach_prob: &Vec<f64>,
+        op_reach_prob: &[f32],
         board: &Board,
-    ) -> Vec<f64> {
+    ) -> Vec<f32> {
         let opp_hands = traversal.get_range_for_opponent(board);
         showdown(opp_hands, op_reach_prob, self.win_utility)
     }
 }
 
 impl ShowdownNode {
-    pub fn new(pot_size: f64) -> Self {
+    pub fn new(pot_size: f32) -> Self {
         Self {
             win_utility: pot_size / 2.0,
         }

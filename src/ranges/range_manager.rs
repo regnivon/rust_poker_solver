@@ -261,7 +261,7 @@ impl RangeManager {
         self.ranges.get(&board_key).unwrap()
     }
 
-    pub fn get_next_reach_probs(&self, new_board: &Board, opp_reach_probs: &Vec<f64>) -> Vec<f64> {
+    pub fn get_next_reach_probs(&self, new_board: &Board, opp_reach_probs: &[f32]) -> Vec<f32> {
         let board_key = get_key(new_board);
         let map = &self.reach_probs_mapping[&board_key];
 
@@ -277,8 +277,8 @@ impl RangeManager {
     pub fn map_utility_backwards(
         &self,
         new_board: &Board,
-        utility: &Vec<f64>,
-        mapped_utility: &mut Vec<f64>,
+        utility: &[f32],
+        mapped_utility: &mut Vec<f32>,
     ) {
         let board_key = get_key(new_board);
         let map = &self.reach_probs_mapping[&board_key];
@@ -286,10 +286,6 @@ impl RangeManager {
         for i in 0..utility.len() {
             mapped_utility[map[i]] += utility[i];
         }
-    }
-
-    fn get_mapping_for_board(&self, board_key: u64) -> &Vec<usize> {
-        self.reach_probs_mapping.get(&board_key).unwrap()
     }
 }
 

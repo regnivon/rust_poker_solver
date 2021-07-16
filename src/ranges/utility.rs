@@ -38,16 +38,16 @@ pub fn construct_starting_range_from_string(
     starting_combinations
 }
 
-pub fn range_relative_probabilities(rng: &Range, opp_range: &Range) -> Vec<f64> {
+pub fn range_relative_probabilities(rng: &Range, opp_range: &Range) -> Vec<f32> {
     let mut normalizing_value = 0.0;
     let mut relatives = vec![0.0; rng.len()];
 
     for i in 0..rng.len() {
         let mut probability = 0.0;
 
-        for j in 0..opp_range.len() {
-            if !check_hands_overlap(&rng[i].hand, &opp_range[j].hand) {
-                probability += opp_range[j].combos;
+        for item in opp_range {
+            if !check_hands_overlap(&rng[i].hand, &item.hand) {
+                probability += item.combos;
             }
         }
         relatives[i] = probability * rng[i].combos;
@@ -60,15 +60,15 @@ pub fn range_relative_probabilities(rng: &Range, opp_range: &Range) -> Vec<f64> 
     relatives
 }
 
-pub fn unblocked_hands(rng: &Range, opp_range: &Range) -> Vec<f64> {
+pub fn unblocked_hands(rng: &Range, opp_range: &Range) -> Vec<f32> {
     let mut hand_counts = vec![0.0; rng.len()];
 
     for i in 0..rng.len() {
         let mut counts = 0.0;
 
-        for j in 0..opp_range.len() {
-            if !check_hands_overlap(&rng[i].hand, &opp_range[j].hand) {
-                counts += opp_range[j].combos;
+        for item in opp_range {
+            if !check_hands_overlap(&rng[i].hand, &item.hand) {
+                counts += item.combos;
             }
         }
         hand_counts[i] = counts;

@@ -81,10 +81,10 @@ impl Game {
 
     fn overall_best_response(
         &self,
-        responder_relative_probs: &Vec<f64>,
-        opp_reach_probs: &Vec<f64>,
+        responder_relative_probs: &[f32],
+        opp_reach_probs: &[f32],
         board: &Board,
-    ) -> f64 {
+    ) -> f32 {
         let responder_hands = self.traversal.get_range_for_active_player(board);
         let opponent_hands = self.traversal.get_range_for_opponent(board);
 
@@ -268,7 +268,7 @@ impl Game {
         }
     }
 
-    fn get_current_bets(&self, street: u8, player: u8, bet_number: u8) -> &Vec<f64> {
+    fn get_current_bets(&self, street: u8, player: u8, bet_number: u8) -> &Vec<f32> {
         let bet = usize::from(bet_number);
         if street == 1 {
             if player == 0 && bet < self.game_params.oop_flop_bets.len() {
