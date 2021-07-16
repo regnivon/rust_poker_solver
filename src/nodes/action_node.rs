@@ -104,6 +104,8 @@ impl ActionNode {
         let nums = self.num_actions * self.num_hands;
         let mut strategy = vec![0.0; nums];
 
+        let probability = 1.0 / (self.num_actions as f64);
+
         for hand in 0..self.num_hands {
             let mut normalizing_value = 0.0;
             for action in 0..self.num_actions {
@@ -121,13 +123,11 @@ impl ActionNode {
                     }
                 }
             } else {
-                let probability = 1.0 / (self.num_actions as f64);
                 for action in 0..self.num_actions {
                     strategy[hand + action * self.num_hands] = probability;
                 }
             }
         }
-
         strategy
     }
 
@@ -169,13 +169,14 @@ impl ActionNode {
         let negative_multiplier = 0.5;
 
         for action in 0..self.num_actions {
+            let offset = action * self.num_hands;
             for hand in 0..self.num_hands {
-                self.regret_accumulator[hand + action * self.num_hands] +=
-                    action_utility[hand + action * self.num_hands] - node_utility[hand];
-                if self.regret_accumulator[hand + action * self.num_hands] > 0.0 {
-                    self.regret_accumulator[hand + action * self.num_hands] *= positive_multiplier;
+                self.regret_accumulator[hand + offset] +=
+                    action_utility[hand + offset] - node_utility[hand];
+                if self.regret_accumulator[hand + offset] > 0.0 {
+                    self.regret_accumulator[hand + offset] *= positive_multiplier;
                 } else {
-                    self.regret_accumulator[hand + action * self.num_hands] *= negative_multiplier;
+                    self.regret_accumulator[hand + offset] *= negative_multiplier;
                 }
             }
         }

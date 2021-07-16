@@ -89,7 +89,6 @@ impl CfrNode for ChanceNode {
         op_reach_prob: &Vec<f64>,
         board: &Board,
     ) -> Vec<f64> {
-        let mut sub_results = vec![];
         let mut result = vec![0.0; traversal.get_num_hands_for_traverser(board)];
         let next_boards: Vec<Board> = self
             .next_cards
@@ -105,9 +104,8 @@ impl CfrNode for ChanceNode {
             })
             .collect();
 
-        if self.parallel {
-            sub_results = self
-                .next_nodes
+        let sub_results: Vec<Vec<f64>> = if self.parallel {
+            self.next_nodes
                 .par_iter()
                 .zip(next_boards.par_iter())
                 .map(|(node, new_board)| {
@@ -119,8 +117,7 @@ impl CfrNode for ChanceNode {
                 })
                 .collect()
         } else {
-            sub_results = self
-                .next_nodes
+            self.next_nodes
                 .iter()
                 .zip(next_boards.iter())
                 .map(|(node, new_board)| {
@@ -131,7 +128,7 @@ impl CfrNode for ChanceNode {
                     mapped_utility
                 })
                 .collect()
-        }
+        };
 
         for i in 0..sub_results.len() {
             for hand in 0..result.len() {

@@ -31,17 +31,17 @@ fn main() {
         1000.0,
         1.0,
         0.75,
-        vec![vec![0.33, 0.75]],
-        vec![vec![0.75]],
-        vec![vec![0.75, 1.5]],
-        vec![vec![0.75]],
-        vec![vec![0.75]],
-        vec![vec![0.75]],
+        vec![vec![0.33, 0.75, 1.5]],
+        vec![vec![0.33, 0.75, 1.5]],
+        vec![vec![0.33, 0.75, 1.5]],
+        vec![vec![0.33, 0.75, 1.5]],
+        vec![vec![0.33, 0.75, 1.5]],
+        vec![vec![0.33, 0.75, 1.5]],
     );
 
     let trav = Traversal::new(rm, rm2);
 
     let mut game = Game::new(trav, params, board);
 
-    game.train(1000);
+    game.train(100);
 }
