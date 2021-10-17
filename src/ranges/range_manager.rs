@@ -267,9 +267,12 @@ impl RangeManager {
 
         let mut new_reach_probs = vec![0.0; map.len()];
 
-        for i in 0..map.len() {
-            new_reach_probs[i] = opp_reach_probs[map[i]];
-        }
+        new_reach_probs
+            .iter_mut()
+            .zip(map.iter())
+            .for_each(|(new_reach, map_idx)| {
+                *new_reach = opp_reach_probs[*map_idx];
+            });
 
         new_reach_probs
     }
@@ -283,9 +286,9 @@ impl RangeManager {
         let board_key = get_key(new_board);
         let map = &self.reach_probs_mapping[&board_key];
 
-        for i in 0..utility.len() {
-            mapped_utility[map[i]] += utility[i];
-        }
+        utility.iter().zip(map.iter()).for_each(|(util, map_idx)| {
+            mapped_utility[*map_idx] += util;
+        });
     }
 }
 

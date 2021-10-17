@@ -41,11 +41,15 @@ impl CfrNode for ActionNode {
             for action in 0..self.num_actions {
                 let next_ev =
                     self.next_nodes[action].best_response(traversal, op_reach_prob, board);
-                for hand_index in 0..best_ev.len() {
-                    if action == 0 || next_ev[hand_index] > best_ev[hand_index] {
-                        best_ev[hand_index] = next_ev[hand_index];
-                    }
-                }
+
+                best_ev
+                    .iter_mut()
+                    .zip(next_ev.iter())
+                    .for_each(|(best, next)| {
+                        if action == 0 || next > best {
+                            *best = *next;
+                        }
+                    });
             }
             best_ev
         } else {
@@ -54,15 +58,25 @@ impl CfrNode for ActionNode {
             for action in 0..self.num_actions {
                 let action_offset = action * self.num_hands;
                 let mut next_reach = vec![0.0; op_reach_prob.len()];
-                for j in 0..self.num_hands {
-                    next_reach[j] = average_strategy[j + action_offset] * op_reach_prob[j];
-                }
+                let strategy_slice = &average_strategy[action_offset..];
+
+                next_reach
+                    .iter_mut()
+                    .zip(strategy_slice.iter())
+                    .zip(op_reach_prob.iter())
+                    .for_each(|((next, strategy), prob)| {
+                        *next = strategy * prob;
+                    });
 
                 let action_ev =
                     self.next_nodes[action].best_response(traversal, &next_reach, board);
-                for j in 0..self.num_hands {
-                    node_ev[j] += action_ev[j];
-                }
+
+                node_ev
+                    .iter_mut()
+                    .zip(action_ev.iter())
+                    .for_each(|(node, action)| {
+                        *node += *action;
+                    });
             }
             node_ev
         }
@@ -271,7 +285,7 @@ impl ActionNode {
             (f64::from(traversal.iteration) / f64::from(traversal.iteration + 1)).powi(2);
 
         for action in 0..self.num_actions {
-            let strategy_slice = &strategies[action * self.num_hands..strategies.len()];
+            let strategy_slice = &strategies[action * self.num_hands..];
             self.strategy_accumulator[action]
                 .iter_mut()
                 .zip(op_reach_prob.iter())
@@ -281,14 +295,6 @@ impl ActionNode {
                     *strategy_sum += prob * strategy;
                     *strategy_sum *= strategy_multiplier as f32;
                 });
-
-            // for hand in 0..self.num_hands {
-            //     self.strategy_accumulator[hand + action * self.num_hands] *= 0.9;
-            //     self.strategy_accumulator[hand + action * self.num_hands] +=
-            //         op_reach_prob[hand] * strategies[hand + action * self.num_hands];
-            //     self.strategy_accumulator[hand + action * self.num_hands] *=
-            //         strategy_multiplier as f32;
-            // }
         }
     }
 
@@ -305,10 +311,15 @@ impl ActionNode {
         for i in 0..self.num_actions {
             let action_offset = i * self.num_hands;
             let result = self.next_nodes[i].cfr_traversal(traversal, op_reach_prob, board);
+            let strategy_slice = &strategies[action_offset..];
 
-            for hand in 0..node_utility.len() {
-                node_utility[hand] += strategies[hand + action_offset] * result[hand];
-            }
+            node_utility
+                .iter_mut()
+                .zip(strategy_slice.iter())
+                .zip(result.iter())
+                .for_each(|((node, strategy), result)| {
+                    *node += strategy * result;
+                });
 
             action_utility[i] = result;
         }
@@ -327,16 +338,25 @@ impl ActionNode {
 
         for i in 0..self.num_actions {
             let action_offset = i * self.num_hands;
-
+            let strategy_slice = &strategies[action_offset..];
             let mut next_reach_prob = vec![0.0; op_reach_prob.len()];
-            for hand in 0..next_reach_prob.len() {
-                next_reach_prob[hand] = strategies[hand + action_offset] * op_reach_prob[hand];
-            }
+
+            next_reach_prob
+                .iter_mut()
+                .zip(strategy_slice.iter())
+                .zip(op_reach_prob.iter())
+                .for_each(|((next, strategy), prob)| {
+                    *next = strategy * prob;
+                });
 
             let result = self.next_nodes[i].cfr_traversal(traversal, &next_reach_prob, board);
-            for hand in 0..node_utility.len() {
-                node_utility[hand] += result[hand];
-            }
+
+            node_utility
+                .iter_mut()
+                .zip(result.iter())
+                .for_each(|(utility, result)| {
+                    *utility += result;
+                });
         }
 
         self.strategy_sum_update(traversal, op_reach_prob, &strategies)

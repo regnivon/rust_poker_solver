@@ -64,10 +64,13 @@ impl CfrNode for ChanceNode {
                 .collect()
         };
 
-        for runout in sub_results {
-            for (hand, val) in result.iter_mut().enumerate() {
-                *val += runout[hand]
-            }
+        for runout in sub_results.iter() {
+            result
+                .iter_mut()
+                .zip(runout.iter())
+                .for_each(|(utility, runout_utility)| {
+                    *utility += runout_utility;
+                });
         }
 
         if self.street == 1 {
@@ -130,10 +133,13 @@ impl CfrNode for ChanceNode {
                 .collect()
         };
 
-        for runout in sub_results {
-            for (hand, val) in result.iter_mut().enumerate() {
-                *val += runout[hand]
-            }
+        for runout in sub_results.iter() {
+            result
+                .iter_mut()
+                .zip(runout.iter())
+                .for_each(|(utility, runout_utility)| {
+                    *utility += runout_utility;
+                });
         }
 
         if self.street == 1 {

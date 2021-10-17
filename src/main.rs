@@ -4,10 +4,6 @@ mod ranges;
 
 extern crate rayon;
 
-//use jemallocator::Jemalloc;
-//#[global_allocator]
-//static GLOBAL: Jemalloc = Jemalloc;
-
 use crate::{
     cfr::{game::Game, game_params::GameParams, traversal::Traversal},
     ranges::{
