@@ -21,4 +21,4 @@ rust_poker =  { version = "0.1.14" }
 rayon = {version = "1.5.1"}
 permutation = "0.2.5"
 enum_dispatch = "0.3.7"
-jemallocator = "0.3.2"
+# jemallocator = "0.3.2"

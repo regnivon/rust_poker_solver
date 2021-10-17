@@ -112,12 +112,8 @@ mod tests {
             &[51, 50, 49, 48, 47],
         );
 
-        println!("{:?}", traverser_hands);
-        println!("{:?}", traverser_hands.len());
-
         let result = node.traverser_utility(5.0, &op_reach_prob, &traverser_hands, &opp_hands);
 
-        println!("{:?}", result);
         for i in 0..30 {
             assert_eq!(result[i], 125.0);
         }
@@ -138,13 +134,8 @@ mod tests {
         let opp_hands =
             construct_starting_range_from_string("QQ,JJ".to_string(), &[51, 50, 49, 48, 47]);
 
-        println!("{:?}", traverser_hands);
-        println!("{:?}", traverser_hands.len());
-        println!("{:?}", op_reach_prob);
-
         let result = node.traverser_utility(5.0, &op_reach_prob, &traverser_hands, &opp_hands);
 
-        println!("{:?}", result);
         for i in 0..6 {
             assert_eq!(result[i], 30.0);
         }

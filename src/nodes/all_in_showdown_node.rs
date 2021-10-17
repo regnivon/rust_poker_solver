@@ -1,5 +1,3 @@
-use std::process::exit;
-
 use crate::{
     cfr::traversal::Traversal,
     nodes::showdown_node::showdown,
