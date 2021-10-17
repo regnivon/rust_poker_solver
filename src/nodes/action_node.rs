@@ -10,8 +10,8 @@ pub struct ActionNode {
     pub ip_stack: f32,
     pub oop_stack: f32,
     next_nodes: Vec<Node>,
-    regret_accumulator: Vec<f32>,
-    strategy_accumulator: Vec<f32>,
+    regret_accumulator: Vec<Vec<f32>>,
+    strategy_accumulator: Vec<Vec<f32>>,
 }
 
 impl CfrNode for ActionNode {
@@ -91,8 +91,8 @@ impl ActionNode {
     }
 
     pub fn init_vectors(&mut self) {
-        self.regret_accumulator = vec![0.0; self.num_actions * self.num_hands];
-        self.strategy_accumulator = vec![0.0; self.num_actions * self.num_hands];
+        self.regret_accumulator = vec![vec![0.0; self.num_hands]; self.num_actions];
+        self.strategy_accumulator = vec![vec![0.0; self.num_hands]; self.num_actions];
     }
 
     pub fn add_child(&mut self, child: Node) {
@@ -106,28 +106,106 @@ impl ActionNode {
 
         let probability = 1.0 / (self.num_actions as f32);
 
-        for hand in 0..self.num_hands {
-            let mut normalizing_value = 0.0;
-            for action in 0..self.num_actions {
-                if self.regret_accumulator[hand + action * self.num_hands] > 0.0 {
-                    normalizing_value += self.regret_accumulator[hand + action * self.num_hands];
-                }
-            }
+        match self.num_actions {
+            2 => {
+                let regret_sum0 = &self.regret_accumulator[0];
+                let regret_sum1 = &self.regret_accumulator[1];
 
-            if normalizing_value > 0.0 {
-                for action in 0..self.num_actions {
-                    if self.regret_accumulator[hand + action * self.num_hands] > 0.0 {
-                        strategy[hand + action * self.num_hands] = self.regret_accumulator
-                            [hand + action * self.num_hands]
-                            / normalizing_value
+                let (strategy0, strategy1) = strategy.split_at_mut(self.num_hands);
+
+                strategy0
+                    .iter_mut()
+                    .zip(strategy1.iter_mut())
+                    .zip(regret_sum0.iter())
+                    .zip(regret_sum1.iter())
+                    .for_each(|(((s0, s1), r0), r1)| {
+                        if *r0 > 0.0 {
+                            if *r1 > 0.0 {
+                                let positive_regret_sum = r0 + r1;
+                                *s0 = r0 / positive_regret_sum;
+                                *s1 = r1 / positive_regret_sum;
+                            } else {
+                                *s0 = 1.0;
+                            }
+                        } else if *r1 > 0.0 {
+                            *s1 = 1.0;
+                        } else {
+                            *s0 = 0.5;
+                            *s1 = 0.5;
+                        }
+                    });
+            }
+            3 => {
+                let regret_sum0 = &self.regret_accumulator[0];
+                let regret_sum1 = &self.regret_accumulator[1];
+                let regret_sum2 = &self.regret_accumulator[2];
+
+                let (strategy0, strategy12) = strategy.split_at_mut(self.num_hands);
+                let (strategy1, strategy2) = strategy12.split_at_mut(self.num_hands);
+
+                for hand in 0..self.num_hands {
+                    if regret_sum0[hand] > 0.0 {
+                        if regret_sum1[hand] > 0.0 {
+                            if regret_sum2[hand] > 0.0 {
+                                let positive_regret_sum =
+                                    regret_sum0[hand] + regret_sum1[hand] + regret_sum2[hand];
+                                strategy0[hand] = regret_sum0[hand] / positive_regret_sum;
+                                strategy1[hand] = regret_sum1[hand] / positive_regret_sum;
+                                strategy2[hand] = regret_sum2[hand] / positive_regret_sum;
+                            } else {
+                                let positive_regret_sum = regret_sum0[hand] + regret_sum1[hand];
+                                strategy0[hand] = regret_sum0[hand] / positive_regret_sum;
+                                strategy1[hand] = regret_sum1[hand] / positive_regret_sum;
+                            }
+                        } else if regret_sum2[hand] > 0.0 {
+                            let positive_regret_sum = regret_sum0[hand] + regret_sum2[hand];
+                            strategy0[hand] = regret_sum0[hand] / positive_regret_sum;
+                            strategy2[hand] = regret_sum2[hand] / positive_regret_sum;
+                        } else {
+                            strategy0[hand] = 1.0;
+                        }
+                    } else if regret_sum1[hand] > 0.0 {
+                        if regret_sum2[hand] > 0.0 {
+                            let positive_regret_sum = regret_sum1[hand] + regret_sum2[hand];
+                            strategy1[hand] = regret_sum1[hand] / positive_regret_sum;
+                            strategy2[hand] = regret_sum2[hand] / positive_regret_sum;
+                        } else {
+                            strategy1[hand] = 1.0;
+                        }
+                    } else if regret_sum2[hand] > 0.0 {
+                        strategy2[hand] = 1.0;
+                    } else {
+                        strategy0[hand] = 1.0 / 3.0;
+                        strategy1[hand] = 1.0 / 3.0;
+                        strategy2[hand] = 1.0 / 3.0;
                     }
                 }
-            } else {
-                for action in 0..self.num_actions {
-                    strategy[hand + action * self.num_hands] = probability;
+            }
+            _ => {
+                for hand in 0..self.num_hands {
+                    let mut normalizing_value = 0.0;
+                    for action in 0..self.num_actions {
+                        if self.regret_accumulator[action][hand] > 0.0 {
+                            normalizing_value += self.regret_accumulator[action][hand];
+                        }
+                    }
+
+                    if normalizing_value > 0.0 {
+                        for action in 0..self.num_actions {
+                            if self.regret_accumulator[action][hand] > 0.0 {
+                                strategy[hand + action * self.num_hands] =
+                                    self.regret_accumulator[action][hand] / normalizing_value
+                            }
+                        }
+                    } else {
+                        for action in 0..self.num_actions {
+                            strategy[hand + action * self.num_hands] = probability;
+                        }
+                    }
                 }
             }
         }
+
         strategy
     }
 
@@ -138,14 +216,13 @@ impl ActionNode {
         for hand in 0..self.num_hands {
             let mut normalizing_value = 0.0;
             for action in 0..self.num_actions {
-                normalizing_value += self.strategy_accumulator[hand + action * self.num_hands];
+                normalizing_value += self.strategy_accumulator[action][hand];
             }
 
             if normalizing_value > 0.0 {
                 for action in 0..self.num_actions {
-                    average_strategy[hand + action * self.num_hands] += self.strategy_accumulator
-                        [hand + action * self.num_hands]
-                        / normalizing_value;
+                    average_strategy[hand + action * self.num_hands] +=
+                        self.strategy_accumulator[action][hand] / normalizing_value;
                 }
             } else {
                 let probability = 1.0 / (self.num_actions as f32);
@@ -161,7 +238,7 @@ impl ActionNode {
     fn regret_sum_update(
         &mut self,
         traversal: &Traversal,
-        action_utility: &[f32],
+        action_utility: Vec<Vec<f32>>,
         node_utility: &[f32],
     ) {
         let alpha = f64::from(traversal.iteration).powf(1.5);
@@ -169,16 +246,18 @@ impl ActionNode {
         let negative_multiplier = 0.5;
 
         for action in 0..self.num_actions {
-            let offset = action * self.num_hands;
-            for hand in 0..self.num_hands {
-                self.regret_accumulator[hand + offset] +=
-                    action_utility[hand + offset] - node_utility[hand];
-                if self.regret_accumulator[hand + offset] > 0.0 {
-                    self.regret_accumulator[hand + offset] *= positive_multiplier as f32;
-                } else {
-                    self.regret_accumulator[hand + offset] *= negative_multiplier;
-                }
-            }
+            self.regret_accumulator[action]
+                .iter_mut()
+                .zip(action_utility[action].iter())
+                .zip(node_utility.iter())
+                .for_each(|((regret, action_util), node_util)| {
+                    *regret += action_util - node_util;
+                    if *regret > 0.0 {
+                        *regret *= positive_multiplier as f32;
+                    } else {
+                        *regret *= negative_multiplier;
+                    }
+                });
         }
     }
 
@@ -192,13 +271,24 @@ impl ActionNode {
             (f64::from(traversal.iteration) / f64::from(traversal.iteration + 1)).powi(2);
 
         for action in 0..self.num_actions {
-            for hand in 0..self.num_hands {
-                self.strategy_accumulator[hand + action * self.num_hands] *= 0.9;
-                self.strategy_accumulator[hand + action * self.num_hands] +=
-                    op_reach_prob[hand] * strategies[hand + action * self.num_hands];
-                self.strategy_accumulator[hand + action * self.num_hands] *=
-                    strategy_multiplier as f32;
-            }
+            let strategy_slice = &strategies[action * self.num_hands..strategies.len()];
+            self.strategy_accumulator[action]
+                .iter_mut()
+                .zip(op_reach_prob.iter())
+                .zip(strategy_slice.iter())
+                .for_each(|((strategy_sum, prob), strategy)| {
+                    *strategy_sum *= 0.9;
+                    *strategy_sum += prob * strategy;
+                    *strategy_sum *= strategy_multiplier as f32;
+                });
+
+            // for hand in 0..self.num_hands {
+            //     self.strategy_accumulator[hand + action * self.num_hands] *= 0.9;
+            //     self.strategy_accumulator[hand + action * self.num_hands] +=
+            //         op_reach_prob[hand] * strategies[hand + action * self.num_hands];
+            //     self.strategy_accumulator[hand + action * self.num_hands] *=
+            //         strategy_multiplier as f32;
+            // }
         }
     }
 
@@ -209,22 +299,21 @@ impl ActionNode {
         node_utility: &mut Vec<f32>,
         board: &Board,
     ) {
-        let mut action_utility = vec![0.0; self.num_actions * self.num_hands];
+        let mut action_utility = vec![vec![0.0; 0]; self.num_actions];
         let strategies = self.get_strategy();
 
         for i in 0..self.num_actions {
             let action_offset = i * self.num_hands;
-
             let result = self.next_nodes[i].cfr_traversal(traversal, op_reach_prob, board);
-
-            action_utility[action_offset..(node_utility.len() + action_offset)].clone_from_slice(&result[..node_utility.len()]);
 
             for hand in 0..node_utility.len() {
                 node_utility[hand] += strategies[hand + action_offset] * result[hand];
             }
+
+            action_utility[i] = result;
         }
 
-        self.regret_sum_update(traversal, &action_utility, node_utility)
+        self.regret_sum_update(traversal, action_utility, node_utility)
     }
 
     fn opponent_cfr(

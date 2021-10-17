@@ -70,22 +70,29 @@ impl TerminalNode {
 
         let mut probability_sum = 0.0;
 
-        for i in 0..opp_hands.len() {
-            if op_reach_prob[i] > 0.0 {
-                probability_sum += op_reach_prob[i];
+        op_reach_prob
+            .iter()
+            .zip(opp_hands.iter())
+            .for_each(|(prob, hand)| {
+                if *prob > 0.0 {
+                    probability_sum += prob;
 
-                card_removal[usize::from(opp_hands[i].hand[0])] += op_reach_prob[i];
-                card_removal[usize::from(opp_hands[i].hand[1])] += op_reach_prob[i];
-            }
-        }
+                    card_removal[usize::from(hand.hand[0])] += prob;
+                    card_removal[usize::from(hand.hand[1])] += prob;
+                }
+            });
 
-        for i in 0..traverser_hands.len() {
-            utility[i] = (probability_sum
-                - card_removal[usize::from(traverser_hands[i].hand[0])]
-                - card_removal[usize::from(traverser_hands[i].hand[1])]
-                + op_reach_prob[i])
-                * win_utility;
-        }
+        utility
+            .iter_mut()
+            .zip(traverser_hands.iter())
+            .zip(op_reach_prob.iter())
+            .for_each(|((util, combo), opp_prob)| {
+                *util = (probability_sum
+                    - card_removal[usize::from(combo.hand[0])]
+                    - card_removal[usize::from(combo.hand[1])]
+                    + opp_prob)
+                    * win_utility;
+            });
 
         utility
     }

@@ -12,13 +12,13 @@ pub fn showdown(hands: &Range, op_reach_prob: &[f32], win_utility: f32) -> Vec<f
     let mut utility = vec![0.0; num_hands];
     let mut card_removal = [0.0; 52];
 
-    for k in 0..num_hands {
-        if op_reach_prob[k] > 0.0 {
-            card_removal[usize::from(hands[k].hand[0])] -= op_reach_prob[k];
-            card_removal[usize::from(hands[k].hand[1])] -= op_reach_prob[k];
-            sum -= op_reach_prob[k];
+    op_reach_prob.iter().zip(hands).for_each(|(prob, hand)| {
+        if *prob > 0.0 {
+            card_removal[usize::from(hand.hand[0])] -= prob;
+            card_removal[usize::from(hand.hand[1])] -= prob;
+            sum -= prob;
         }
-    }
+    });
 
     let mut i = 0;
 
@@ -28,24 +28,38 @@ pub fn showdown(hands: &Range, op_reach_prob: &[f32], win_utility: f32) -> Vec<f
             j += 1;
         }
 
-        for k in i..j {
-            card_removal[usize::from(hands[k].hand[0])] += op_reach_prob[k];
-            card_removal[usize::from(hands[k].hand[1])] += op_reach_prob[k];
-            sum += op_reach_prob[k];
-        }
+        let prob_slice = &op_reach_prob[i..j];
+        let hand_slice = &hands[i..j];
+        let util_slice = &mut utility[i..j];
 
-        for k in i..j {
-            utility[k] = win_utility
-                * (sum
-                    - card_removal[usize::from(hands[k].hand[0])]
-                    - card_removal[usize::from(hands[k].hand[1])])
-        }
+        prob_slice
+            .iter()
+            .zip(hand_slice.iter())
+            .for_each(|(prob, hand)| {
+                card_removal[usize::from(hand.hand[0])] += prob;
+                card_removal[usize::from(hand.hand[1])] += prob;
+                sum += prob;
+            });
 
-        for k in i..j {
-            card_removal[usize::from(hands[k].hand[0])] += op_reach_prob[k];
-            card_removal[usize::from(hands[k].hand[1])] += op_reach_prob[k];
-            sum += op_reach_prob[k];
-        }
+        util_slice
+            .iter_mut()
+            .zip(hand_slice.iter())
+            .for_each(|(util, hand)| {
+                *util = win_utility
+                    * (sum
+                        - card_removal[usize::from(hand.hand[0])]
+                        - card_removal[usize::from(hand.hand[1])])
+            });
+
+        prob_slice
+            .iter()
+            .zip(hand_slice.iter())
+            .for_each(|(prob, hand)| {
+                card_removal[usize::from(hand.hand[0])] += prob;
+                card_removal[usize::from(hand.hand[1])] += prob;
+                sum += prob;
+            });
+
         i = j;
     }
 
