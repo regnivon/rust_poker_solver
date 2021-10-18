@@ -13,7 +13,54 @@ use crate::{
     },
 };
 
-fn main() {
+use tonic::{transport::Server, Request, Response, Status};
+
+use solver::greeter_server::{Greeter, GreeterServer};
+use solver::{HelloReply, HelloRequest};
+
+pub mod solver {
+    tonic::include_proto!("solver");
+}
+
+#[derive(Debug, Default)]
+pub struct MyGreeter {}
+
+#[tonic::async_trait]
+impl Greeter for MyGreeter {
+    async fn say_hello(
+        &self,
+        request: Request<HelloRequest>, // Accept request of type HelloRequest
+    ) -> Result<Response<HelloReply>, Status> {
+        // Return an instance of type HelloReply
+        println!("Got a request: {:?}", request);
+
+        let reply = solver::HelloReply {
+            message: format!("Hello {}!", request.into_inner().name).into(), // We must use .into_inner() as the fields of gRPC requests and responses are private
+        };
+
+        let blocking_task = tokio::task::spawn_blocking(run_trainer);
+
+        Ok(Response::new(reply)) // Send back our formatted greeting
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    //let blocking_task = tokio::task::spawn_blocking(run_trainer);
+    //blocking_task.await.unwrap();
+
+    let addr = "[::1]:50051".parse()?;
+    let greeter = MyGreeter::default();
+
+    Server::builder()
+        .add_service(GreeterServer::new(greeter))
+        .serve(addr)
+        .await?;
+
+    Ok(())
+}
+
+fn run_trainer() {
     let board: Board = [
         card_to_number("kc".to_string()),
         card_to_number("7h".to_string()),
