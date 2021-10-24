@@ -1,0 +1,96 @@
+syntax = "proto3";
+package regnivon.v1.solver;
+import "google/api/annotations.proto";
+
+
+service SolverService {
+    rpc SolveGame(SolveGameRequest) returns (SolveGameResponse) {
+        option (google.api.http) = {
+            post : "/v1/solver/solve"
+            body : "*"
+        };
+    }
+
+    rpc SolutionStatus(SolutionStatusRequest) returns (SolutionStatusResponse) {
+        option (google.api.http) = {
+            post : "/v1/solver/solve/{simulation_id}"
+            body : "*"
+        };
+    }
+
+    rpc GetNodeResults(GetNodeResultsRequest) returns (GetNodeResultsResponse) {
+        option (google.api.http) = {
+            get : "/v1/solver/solve/result/{simulation_id}/{action_sequence}"
+        };
+    }
+
+    rpc GetWholeStreetSolution(GetWholeStreetSolutionRequest) returns (GetWholeStreetSolutionResponse) {
+        option (google.api.http) = {
+            get : "/v1/solver/solve/result/{simulation_id}/{street}/{runout}"
+        };
+    }
+
+    rpc GetFrequenciesAcrossRunouts(GetFrequenciesAcrossRunoutsRequest) returns (GetFrequenciesAcrossRunoutsResponse) {
+        option (google.api.http) = {
+            get : "/v1/solver/solve/result/frequencies/{simulation_id}/{street}/{runout}"
+        };
+    }
+}
+
+message SolveGameRequest {
+    int64 simulation_id = 1;
+    float target_exploitability = 2;
+}
+
+enum SimulationStatus {
+    SimulationStatus_Created = 0;
+    SimulationStatus_Solving = 1;
+    SimulationStatus_Done = 2;
+}
+
+message SolveGameResponse {
+    int64 simulation_id = 1;
+    SimulationStatus status = 2;
+}
+
+message SolutionStatusRequest {
+    int64 simulation_id = 1;
+}
+
+message SolutionStatusResponse {
+    int64 simulation_id = 1;
+    SimulationStatus status = 2;
+    float current_exploitability = 3;
+}
+
+message GetNodeResultsRequest {
+    int64 simulation_id = 1;
+    string action_sequence = 2;
+}
+
+message GetNodeResultsResponse {
+    int64 simulation_id = 1;
+    NodeResult result = 2;
+}
+
+message GetWholeStreetSolutionRequest {
+    int64 simulation_id = 1;
+    Street street = 2;
+    string runout = 3;
+}
+
+message GetWholeStreetSolutionResponse {
+    int64 simulation_id = 1;
+    WholeStreetResult result = 2;
+}
+
+message GetFrequenciesAcrossRunoutsRequest {
+    int64 simulation_id = 1;
+    Street street = 2;
+    string runout = 3;
+}
+
+message GetFrequenciesAcrossRunoutsResponse {
+    int64 simulation_id = 1;
+    repeated OverallNodeResult results = 2;
+}
