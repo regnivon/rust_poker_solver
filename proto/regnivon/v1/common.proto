@@ -1,0 +1,41 @@
+syntax = "proto3";
+package regnivon.v1.common;
+
+enum Actions {
+  ACTIONS_UNSPECIFIED = 0;
+  ACTIONS_FOLD = 1;
+  ACTIONS_CHECK = 2;
+  ACTIONS_BET = 3;
+}
+
+enum Street {
+  Street_Unspecified = 0;
+  Street_Flop = 1;
+  Street_Turn = 2;
+  Street_River = 3;
+}
+
+message CombinationActions {
+  string combination = 1;
+  float frequency = 2;
+  repeated float action_frequency = 3;
+}
+
+message NodeResult {
+  string action_sequence = 1;
+  repeated Actions action_list = 2;
+  repeated float bet_sizings = 3;
+  repeated CombinationActions hand_actions = 4;
+}
+
+message OverallNodeResult {
+  string action_sequence = 1;
+  repeated Actions action_list = 2;
+  repeated float bet_sizings = 3;
+  repeated float overall_frequencies = 4;
+}
+
+message WholeStreetResult {
+  repeated NodeResult results = 1;
+}
+

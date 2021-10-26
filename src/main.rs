@@ -13,34 +13,101 @@ use crate::{
     },
 };
 
-use tonic::{transport::Server, Request, Response, Status};
-
-use solver::greeter_server::{Greeter, GreeterServer};
-use solver::{HelloReply, HelloRequest};
+use tonic::{transport::Server, Response};
 
 pub mod solver {
-    tonic::include_proto!("solver");
+    tonic::include_proto!("regnivon.v1.solver");
+    pub(crate) const REFLECTION_SERVICE_DESCRIPTOR: &[u8] =
+        tonic::include_file_descriptor_set!("solver_v1");
 }
 
+pub mod common {
+    tonic::include_proto!("regnivon.v1.common");
+}
+
+// use solver::greeter_server::{Greeter, GreeterServer};
+// use solver::{HelloReply, HelloRequest};
+
+use solver::solver_service_server::{SolverService, SolverServiceServer};
+
+use solver::*;
+
 #[derive(Debug, Default)]
-pub struct MyGreeter {}
+pub struct Solver {}
 
 #[tonic::async_trait]
-impl Greeter for MyGreeter {
-    async fn say_hello(
-        &self,
-        request: Request<HelloRequest>, // Accept request of type HelloRequest
-    ) -> Result<Response<HelloReply>, Status> {
-        // Return an instance of type HelloReply
-        println!("Got a request: {:?}", request);
+impl SolverService for Solver {
+    // async fn say_hello(
+    //     &self,
+    //     request: Request<HelloRequest>, // Accept request of type HelloRequest
+    // ) -> Result<Response<HelloReply>, Status> {
+    //     // Return an instance of type HelloReply
+    //     println!("Got a request: {:?}", request);
 
-        let reply = solver::HelloReply {
-            message: format!("Hello {}!", request.into_inner().name).into(), // We must use .into_inner() as the fields of gRPC requests and responses are private
+    //     let reply = solver::HelloReply {
+    //         message: format!("Hello {}!", request.into_inner().name).into(), // We must use .into_inner() as the fields of gRPC requests and responses are private
+    //     };
+
+    //     let blocking_task = tokio::task::spawn_blocking(run_trainer);
+    // }
+
+    async fn solve_game(
+        &self,
+        request: tonic::Request<SolveGameRequest>,
+    ) -> Result<tonic::Response<SolveGameResponse>, tonic::Status> {
+        let reply = SolveGameResponse {
+            simulation_id: 12,
+            status: SimulationStatus::Solving,
         };
 
         let blocking_task = tokio::task::spawn_blocking(run_trainer);
 
-        Ok(Response::new(reply)) // Send back our formatted greeting
+        Ok(Response::new(reply))
+    }
+
+    async fn solution_status(
+        &self,
+        request: tonic::Request<SolutionStatusRequest>,
+    ) -> Result<tonic::Response<SolutionStatusResponse>, tonic::Status> {
+        let reply = SolutionStatusResponse {
+            simulation_id: todo!(),
+            status: todo!(),
+            current_exploitability: todo!(),
+        };
+
+        Ok(Response::new(reply))
+    }
+
+    async fn get_node_results(
+        &self,
+        request: tonic::Request<GetNodeResultsRequest>,
+    ) -> Result<tonic::Response<GetNodeResultsResponse>, tonic::Status> {
+        let reply = GetNodeResultsResponse {
+            simulation_id: todo!(),
+            result: todo!(),
+        };
+
+        Ok(Response::new(reply))
+    }
+
+    async fn get_whole_street_solution(
+        &self,
+        request: tonic::Request<GetWholeStreetSolutionRequest>,
+    ) -> Result<tonic::Response<GetWholeStreetSolutionResponse>, tonic::Status> {
+        Ok(Response::new(GetWholeStreetSolutionResponse {
+            simulation_id: todo!(),
+            result: todo!(),
+        }))
+    }
+
+    async fn get_frequencies_across_runouts(
+        &self,
+        request: tonic::Request<GetFrequenciesAcrossRunoutsRequest>,
+    ) -> Result<tonic::Response<GetFrequenciesAcrossRunoutsResponse>, tonic::Status> {
+        Ok(Response::new(GetFrequenciesAcrossRunoutsResponse {
+            simulation_id: todo!(),
+            results: todo!(),
+        }))
     }
 }
 
@@ -50,10 +117,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //blocking_task.await.unwrap();
 
     let addr = "[::1]:50051".parse()?;
-    let greeter = MyGreeter::default();
+    let solver_server = Solver {};
+    let service = tonic_reflection::server::Builder::configure()
+        .register_encoded_file_descriptor_set(solver::REFLECTION_SERVICE_DESCRIPTOR)
+        .build()
+        .unwrap();
 
     Server::builder()
-        .add_service(GreeterServer::new(greeter))
+        .add_service(SolverServiceServer::new(solver_server))
+        .add_service(service)
         .serve(addr)
         .await?;
 

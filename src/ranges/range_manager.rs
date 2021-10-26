@@ -247,7 +247,7 @@ impl RangeManager {
             ));
         }
 
-        river_hands.sort_by_key(|k| k.rank);
+        river_hands.sort_unstable_by_key(|k| k.rank);
 
         self.add_range_for_board(river_hands, river_board_key);
     }

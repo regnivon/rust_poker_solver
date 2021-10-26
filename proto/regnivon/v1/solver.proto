@@ -1,7 +1,8 @@
 syntax = "proto3";
 package regnivon.v1.solver;
-import "google/api/annotations.proto";
 
+import "google/api/annotations.proto";
+import "regnivon/v1/common.proto";
 
 service SolverService {
     rpc SolveGame(SolveGameRequest) returns (SolveGameResponse) {
@@ -43,9 +44,10 @@ message SolveGameRequest {
 }
 
 enum SimulationStatus {
-    SimulationStatus_Created = 0;
-    SimulationStatus_Solving = 1;
-    SimulationStatus_Done = 2;
+    SimulationStatus_Unknown = 0;
+    SimulationStatus_Created = 1;
+    SimulationStatus_Solving = 2;
+    SimulationStatus_Done = 3;
 }
 
 message SolveGameResponse {
@@ -70,27 +72,27 @@ message GetNodeResultsRequest {
 
 message GetNodeResultsResponse {
     int64 simulation_id = 1;
-    NodeResult result = 2;
+    regnivon.v1.common.NodeResult result = 2;
 }
 
 message GetWholeStreetSolutionRequest {
     int64 simulation_id = 1;
-    Street street = 2;
+    regnivon.v1.common.Street street = 2;
     string runout = 3;
 }
 
 message GetWholeStreetSolutionResponse {
     int64 simulation_id = 1;
-    WholeStreetResult result = 2;
+    regnivon.v1.common.WholeStreetResult result = 2;
 }
 
 message GetFrequenciesAcrossRunoutsRequest {
     int64 simulation_id = 1;
-    Street street = 2;
+    regnivon.v1.common.Street street = 2;
     string runout = 3;
 }
 
 message GetFrequenciesAcrossRunoutsResponse {
     int64 simulation_id = 1;
-    repeated OverallNodeResult results = 2;
+    repeated regnivon.v1.common.OverallNodeResult results = 2;
 }
