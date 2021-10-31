@@ -10,8 +10,8 @@ pub struct ActionNode {
     pub ip_stack: f32,
     pub oop_stack: f32,
     next_nodes: Vec<Node>,
-    regret_accumulator: Vec<Vec<f32>>,
-    strategy_accumulator: Vec<Vec<f32>>,
+    regret_accumulator: Vec<f32>,
+    strategy_accumulator: Vec<f32>,
 }
 
 impl CfrNode for ActionNode {
@@ -105,8 +105,8 @@ impl ActionNode {
     }
 
     pub fn init_vectors(&mut self) {
-        self.regret_accumulator = vec![vec![0.0; self.num_hands]; self.num_actions];
-        self.strategy_accumulator = vec![vec![0.0; self.num_hands]; self.num_actions];
+        self.regret_accumulator = vec![0.0; self.num_hands * self.num_actions];
+        self.strategy_accumulator = vec![0.0; self.num_hands * self.num_actions];
     }
 
     pub fn add_child(&mut self, child: Node) {
@@ -122,8 +122,8 @@ impl ActionNode {
 
         match self.num_actions {
             2 => {
-                let regret_sum0 = &self.regret_accumulator[0];
-                let regret_sum1 = &self.regret_accumulator[1];
+                let regret_sum0 = &self.regret_accumulator[0..self.num_hands];
+                let regret_sum1 = &self.regret_accumulator[self.num_hands..];
 
                 let (strategy0, strategy1) = strategy.split_at_mut(self.num_hands);
 
@@ -150,9 +150,9 @@ impl ActionNode {
                     });
             }
             3 => {
-                let regret_sum0 = &self.regret_accumulator[0];
-                let regret_sum1 = &self.regret_accumulator[1];
-                let regret_sum2 = &self.regret_accumulator[2];
+                let regret_sum0 = &self.regret_accumulator[0..self.num_hands];
+                let regret_sum1 = &self.regret_accumulator[self.num_hands..self.num_hands * 2];
+                let regret_sum2 = &self.regret_accumulator[self.num_hands * 2..];
 
                 let (strategy0, strategy12) = strategy.split_at_mut(self.num_hands);
                 let (strategy1, strategy2) = strategy12.split_at_mut(self.num_hands);
@@ -199,16 +199,18 @@ impl ActionNode {
                 for hand in 0..self.num_hands {
                     let mut normalizing_value = 0.0;
                     for action in 0..self.num_actions {
-                        if self.regret_accumulator[action][hand] > 0.0 {
-                            normalizing_value += self.regret_accumulator[action][hand];
+                        if self.regret_accumulator[hand + action * self.num_hands] > 0.0 {
+                            normalizing_value +=
+                                self.regret_accumulator[hand + action * self.num_hands];
                         }
                     }
 
                     if normalizing_value > 0.0 {
                         for action in 0..self.num_actions {
-                            if self.regret_accumulator[action][hand] > 0.0 {
-                                strategy[hand + action * self.num_hands] =
-                                    self.regret_accumulator[action][hand] / normalizing_value
+                            if self.regret_accumulator[hand + action * self.num_hands] > 0.0 {
+                                strategy[hand + action * self.num_hands] = self.regret_accumulator
+                                    [hand + action * self.num_hands]
+                                    / normalizing_value
                             }
                         }
                     } else {
@@ -230,13 +232,13 @@ impl ActionNode {
         for hand in 0..self.num_hands {
             let mut normalizing_value = 0.0;
             for action in 0..self.num_actions {
-                normalizing_value += self.strategy_accumulator[action][hand];
+                normalizing_value += self.strategy_accumulator[hand + action * self.num_hands];
             }
 
             if normalizing_value > 0.0 {
                 for action in 0..self.num_actions {
                     average_strategy[hand + action * self.num_hands] +=
-                        self.strategy_accumulator[action][hand] / normalizing_value;
+                        self.strategy_accumulator[hand + action * self.num_hands] / normalizing_value;
                 }
             } else {
                 let probability = 1.0 / (self.num_actions as f32);
@@ -260,7 +262,7 @@ impl ActionNode {
         let negative_multiplier = 0.5;
 
         for action in 0..self.num_actions {
-            self.regret_accumulator[action]
+            self.regret_accumulator[action * self.num_hands..(action + 1) * self.num_hands]
                 .iter_mut()
                 .zip(action_utility[action].iter())
                 .zip(node_utility.iter())
@@ -286,7 +288,7 @@ impl ActionNode {
 
         for action in 0..self.num_actions {
             let strategy_slice = &strategies[action * self.num_hands..];
-            self.strategy_accumulator[action]
+            self.strategy_accumulator[action * self.num_hands..(action + 1) * self.num_hands]
                 .iter_mut()
                 .zip(op_reach_prob.iter())
                 .zip(strategy_slice.iter())

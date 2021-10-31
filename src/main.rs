@@ -29,7 +29,7 @@ pub mod common {
 // use solver::{HelloReply, HelloRequest};
 
 use solver::solver_service_server::{SolverService, SolverServiceServer};
-
+use solver::SolveGameRequest;
 use solver::*;
 
 #[derive(Debug, Default)]
@@ -55,12 +55,16 @@ impl SolverService for Solver {
         &self,
         request: tonic::Request<SolveGameRequest>,
     ) -> Result<tonic::Response<SolveGameResponse>, tonic::Status> {
+        let req = request.into_inner();
+
+        println!("{:?}", req);
+
         let reply = SolveGameResponse {
             simulation_id: 12,
-            status: SimulationStatus::Solving,
+            status: SimulationStatus::Created as i32,
         };
 
-        let blocking_task = tokio::task::spawn_blocking(run_trainer);
+        tokio::task::spawn_blocking(run_trainer);
 
         Ok(Response::new(reply))
     }
@@ -113,21 +117,21 @@ impl SolverService for Solver {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    //let blocking_task = tokio::task::spawn_blocking(run_trainer);
-    //blocking_task.await.unwrap();
+    let blocking_task = tokio::task::spawn_blocking(run_trainer);
+    blocking_task.await.unwrap();
 
-    let addr = "[::1]:50051".parse()?;
-    let solver_server = Solver {};
-    let service = tonic_reflection::server::Builder::configure()
-        .register_encoded_file_descriptor_set(solver::REFLECTION_SERVICE_DESCRIPTOR)
-        .build()
-        .unwrap();
+    // let addr = "[::1]:50051".parse()?;
+    // let solver_server = Solver {};
+    // let service = tonic_reflection::server::Builder::configure()
+    //     .register_encoded_file_descriptor_set(solver::REFLECTION_SERVICE_DESCRIPTOR)
+    //     .build()
+    //     .unwrap();
 
-    Server::builder()
-        .add_service(SolverServiceServer::new(solver_server))
-        .add_service(service)
-        .serve(addr)
-        .await?;
+    // Server::builder()
+    //     .add_service(SolverServiceServer::new(solver_server))
+    //     .add_service(service)
+    //     .serve(addr)
+    //     .await?;
 
     Ok(())
 }
@@ -165,5 +169,5 @@ fn run_trainer() {
     let mut game = Game::new(trav, params, board);
 
     //2.82
-    game.train(25);
+    game.train(50);
 }
