@@ -140,7 +140,7 @@ fn run_trainer() {
     let board: Board = [
         card_to_number("kc".to_string()),
         card_to_number("7h".to_string()),
-        card_to_number("2d".to_string()),
+        card_to_number("2h".to_string()),
         52, //card_to_number("3d".to_string()),
         52, //card_to_number("2c".to_string()),
     ];

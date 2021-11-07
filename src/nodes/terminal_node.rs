@@ -2,7 +2,6 @@ use crate::{
     cfr::traversal::Traversal,
     ranges::combination::{Board, Combination},
 };
-
 use super::node::CfrNode;
 
 pub struct TerminalNode {
