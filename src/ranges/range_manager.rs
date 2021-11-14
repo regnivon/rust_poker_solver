@@ -447,6 +447,7 @@ mod tests {
         assert_eq!(get_key(&board), 307211341);
     }
 
+    /*
     #[test]
     fn test_rm_from_river() {
         let board: Board = [2, 6, 20, 12, 40];
@@ -569,4 +570,5 @@ mod tests {
             }
         }
     }
+    */
 }

@@ -4,7 +4,13 @@ use rayon::iter::{
 
 use crate::{
     cfr::traversal::Traversal,
-    ranges::{combination::Board, utility::check_card_overlap},
+    ranges::{
+        combination::Board,
+        utility::{
+            board_has_turn, build_initial_suit_groups, build_next_suit_groups, check_card_overlap,
+            get_rank, get_suit,
+        },
+    },
 };
 
 use super::node::{CfrNode, Node};
@@ -13,6 +19,7 @@ pub struct ChanceNode {
     street: u8,
     next_nodes: Vec<Node>,
     pub next_cards: Vec<u8>,
+    next_weights: Vec<i8>,
     parallel: bool,
 }
 
@@ -64,12 +71,12 @@ impl CfrNode for ChanceNode {
                 .collect()
         };
 
-        for runout in sub_results.iter() {
+        for (runout, weight) in sub_results.iter().zip(self.next_weights.iter()) {
             result
                 .iter_mut()
                 .zip(runout.iter())
                 .for_each(|(utility, runout_utility)| {
-                    *utility += runout_utility;
+                    *utility += runout_utility * f32::from(*weight);
                 });
         }
 
@@ -148,12 +155,12 @@ impl CfrNode for ChanceNode {
                 .collect()
         };
 
-        for runout in sub_results.iter() {
+        for (runout, weight) in sub_results.iter().zip(self.next_weights.iter()) {
             result
                 .iter_mut()
                 .zip(runout.iter())
                 .for_each(|(utility, runout_utility)| {
-                    *utility += runout_utility;
+                    *utility += runout_utility * f32::from(*weight);
                 });
         }
 
@@ -188,16 +195,14 @@ impl CfrNode for ChanceNode {
 impl ChanceNode {
     pub fn new(board: &Board, street: u8, parallel: bool) -> Self {
         let mut next_cards = vec![];
-        for i in 0..52 {
-            if !check_card_overlap(i, board) {
-                next_cards.push(i);
-            }
-        }
+        let mut next_weights = vec![];
+        build_next(board, &mut next_cards, &mut next_weights);
 
         Self {
             street,
             next_nodes: vec![],
             next_cards,
+            next_weights,
             parallel,
         }
     }
@@ -207,17 +212,90 @@ impl ChanceNode {
     }
 }
 
+fn build_next(board: &Board, next_cards: &mut Vec<u8>, next_weights: &mut Vec<i8>) {
+    let suit_groups = if board_has_turn(board) {
+        let flop_groups = build_initial_suit_groups(&[board[0], board[1], board[2], 52, 52]);
+        build_next_suit_groups(board, &flop_groups)
+    } else {
+        build_initial_suit_groups(board)
+    };
+
+    let mut suit_weights = [0i8; 4];
+
+    for suit in 0u8..4 {
+        if suit_groups[usize::from(suit)] == suit {
+            suit_weights[usize::from(suit)] =
+                suit_groups.iter().filter(|&n| *n == suit).count() as i8;
+        } else {
+            suit_weights[usize::from(suit)] = 0;
+        }
+    }
+
+    for i in 0..52 {
+        if !check_card_overlap(i, board) {
+            let suit = get_suit(i);
+            if suit_weights[usize::from(suit)] != 0 {
+                next_cards.push(i);
+                next_weights.push(suit_weights[usize::from(suit)]);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::ranges::combination::Board;
+    use crate::ranges::{combination::Board, utility::card_to_number};
 
-    use super::ChanceNode;
+    use super::*;
 
     #[test]
     fn test_correct_turn_cards_amount() {
-        let board: Board = [2, 6, 20, 52, 52];
+        let board: Board = [
+            card_to_number("kc".to_string()),
+            card_to_number("7h".to_string()),
+            card_to_number("2h".to_string()),
+            52,
+            52,
+        ];
         let chance = ChanceNode::new(&board, 1, true);
-        assert_eq!(chance.next_cards.len(), 49);
+        assert_eq!(chance.next_cards.len(), 36);
+        assert_eq!(chance.next_weights.len(), 36);
+        for card in chance.next_cards.iter() {
+            assert!(!board.contains(card));
+        }
+    }
+
+    #[test]
+    fn test_correct_turn_cards_amount_2() {
+        let board: Board = [
+            card_to_number("7c".to_string()),
+            card_to_number("7h".to_string()),
+            card_to_number("7d".to_string()),
+            52,
+            52,
+        ];
+        let chance = ChanceNode::new(&board, 1, true);
+        assert_eq!(chance.next_cards.len(), 25);
+        assert_eq!(chance.next_weights.len(), 25);
+        println!("{:?}", chance.next_weights);
+        for card in chance.next_cards.iter() {
+            assert!(!board.contains(card));
+        }
+    }
+
+    #[test]
+    fn test_correct_turn_cards_amount_3() {
+        let board: Board = [
+            card_to_number("kc".to_string()),
+            card_to_number("7c".to_string()),
+            card_to_number("2c".to_string()),
+            52,
+            52,
+        ];
+        let chance = ChanceNode::new(&board, 1, true);
+        assert_eq!(chance.next_cards.len(), 23);
+        assert_eq!(chance.next_weights.len(), 23);
+        println!("{:?}", chance.next_weights);
         for card in chance.next_cards.iter() {
             assert!(!board.contains(card));
         }

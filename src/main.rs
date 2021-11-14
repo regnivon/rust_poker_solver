@@ -138,7 +138,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn run_trainer() {
     let board: Board = [
-        card_to_number("kc".to_string()),
+        card_to_number("kh".to_string()),
         card_to_number("7h".to_string()),
         card_to_number("2h".to_string()),
         52, //card_to_number("3d".to_string()),
