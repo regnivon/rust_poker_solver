@@ -177,5 +177,5 @@ fn run_trainer() {
     user    11m19.130s
     sys     0m5.169s
      */
-    game.train(50);
+    game.train(200);
 }

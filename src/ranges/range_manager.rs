@@ -41,9 +41,6 @@ pub struct RangeManager {
 // TODO: Track where my hand is in opponents range for terminal eval
 impl RangeManager {
     pub fn new(starting_combinations: Vec<Combination>, initial_board: Board) -> Self {
-        //     flopIndexer = std::make_unique<HandIndexer>(std::vector<uint8_t>({ 2, 3 }));
-        // turnIndexer = std::make_unique<HandIndexer>(std::vector<uint8_t>({ 2, 3, 1 }));
-        // riverIndexer = std::make_unique<HandIndexer>(std::vector<uint8_t>({ 2, 3, 1, 1 }));
         let mut rm = RangeManager {
             starting_combinations,
             ranges: HashMap::new(),
@@ -372,15 +369,24 @@ impl RangeManager {
 
     pub fn get_next_reach_probs(&self, new_board: &Board, opp_reach_probs: &[f32]) -> Vec<f32> {
         let board_key = get_key(new_board);
-        let map = &self.reach_probs_mapping[&board_key];
+        let next_hands = &self.ranges[&board_key];
 
-        let mut new_reach_probs = vec![0.0; map.len()];
+        let mut last_board = new_board.clone();
+        if last_board[4] == 52 {
+            last_board[3] = 52;
+        } else {
+            last_board[4] = 52;
+        }
+        let last_board_key = get_key(&last_board);
+        let map = &self.reach_probs_mapping[&last_board_key];
+
+        let mut new_reach_probs = vec![0.0; next_hands.len()];
 
         new_reach_probs
             .iter_mut()
-            .zip(map.iter())
-            .for_each(|(new_reach, map_idx)| {
-                *new_reach = opp_reach_probs[*map_idx];
+            .zip(next_hands.iter())
+            .for_each(|(new_reach, next_hand)| {
+                *new_reach = opp_reach_probs[map[next_hand.raw_index]];
             });
 
         new_reach_probs
@@ -393,11 +399,23 @@ impl RangeManager {
         mapped_utility: &mut Vec<f32>,
     ) {
         let board_key = get_key(new_board);
-        let map = &self.reach_probs_mapping[&board_key];
+        let next_hands = &self.ranges[&board_key];
 
-        utility.iter().zip(map.iter()).for_each(|(util, map_idx)| {
-            mapped_utility[*map_idx] += util;
-        });
+        let mut last_board = new_board.clone();
+        if last_board[4] == 52 {
+            last_board[3] = 52;
+        } else {
+            last_board[4] = 52;
+        }
+        let last_board_key = get_key(&last_board);
+        let map = &self.reach_probs_mapping[&last_board_key];
+
+        utility
+            .iter()
+            .zip(next_hands.iter())
+            .for_each(|(util, next_hand)| {
+                mapped_utility[map[next_hand.raw_index]] += util;
+            });
     }
 
     pub fn get_reach_probs_mapping(&self, board: &Board) -> &Vec<usize> {
