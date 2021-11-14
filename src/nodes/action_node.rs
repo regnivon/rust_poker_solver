@@ -237,8 +237,9 @@ impl ActionNode {
 
             if normalizing_value > 0.0 {
                 for action in 0..self.num_actions {
-                    average_strategy[hand + action * self.num_hands] +=
-                        self.strategy_accumulator[hand + action * self.num_hands] / normalizing_value;
+                    average_strategy[hand + action * self.num_hands] += self.strategy_accumulator
+                        [hand + action * self.num_hands]
+                        / normalizing_value;
                 }
             } else {
                 let probability = 1.0 / (self.num_actions as f32);

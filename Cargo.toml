@@ -15,7 +15,7 @@ debuginfo-level = 1
 
 
 [dependencies]
-rust_poker =  { version = "0.1.14" }
+rust_poker =  { version = "0.1.14", features = ["indexer"]}
 rayon = {version = "1.5.1"}
 permutation = "0.2.5"
 enum_dispatch = "0.3.7"

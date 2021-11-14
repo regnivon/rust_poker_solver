@@ -168,6 +168,14 @@ fn run_trainer() {
 
     let mut game = Game::new(trav, params, board);
 
-    //2.82
+    /*
+    Iteration 0 OOP BR 139.70445 IP BR 146.03627 exploitability = 238.11726 percent of the pot
+    Iteration 25 OOP BR 2.500492 IP BR 7.2116675 exploitability = 8.093467 percent of the pot
+    Iteration 50 OOP BR -1.7358472 IP BR 3.756436 exploitability = 1.6838242 percent of the pot
+
+    real    0m54.853s
+    user    11m19.130s
+    sys     0m5.169s
+     */
     game.train(50);
 }

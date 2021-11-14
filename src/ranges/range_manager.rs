@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use rust_poker::hand_evaluator::{evaluate, Hand, CARDS};
+use rust_poker::{HandIndex, HandIndexer};
 
 use super::{
     combination::{Board, Combination},
@@ -32,15 +33,24 @@ pub struct RangeManager {
     starting_combinations: Vec<Combination>,
     ranges: HashMap<u64, Vec<Combination>>,
     reach_probs_mapping: HashMap<u64, Vec<usize>>,
+    flop_indexer: HandIndexer,
+    turn_indexer: HandIndexer,
+    river_indexer: HandIndexer,
 }
 
 // TODO: Track where my hand is in opponents range for terminal eval
 impl RangeManager {
     pub fn new(starting_combinations: Vec<Combination>, initial_board: Board) -> Self {
+        //     flopIndexer = std::make_unique<HandIndexer>(std::vector<uint8_t>({ 2, 3 }));
+        // turnIndexer = std::make_unique<HandIndexer>(std::vector<uint8_t>({ 2, 3, 1 }));
+        // riverIndexer = std::make_unique<HandIndexer>(std::vector<uint8_t>({ 2, 3, 1, 1 }));
         let mut rm = RangeManager {
             starting_combinations,
             ranges: HashMap::new(),
             reach_probs_mapping: HashMap::new(),
+            flop_indexer: HandIndexer::init(2, [2, 3].to_vec()),
+            turn_indexer: HandIndexer::init(3, [2, 3, 1].to_vec()),
+            river_indexer: HandIndexer::init(4, [2, 3, 1, 1].to_vec()),
         };
 
         rm.init(&initial_board);
@@ -70,6 +80,50 @@ impl RangeManager {
     }
 
     fn init_ranges_from_flop(&mut self, initial_board: &Board) {
+        let mut canon_index_to_range_index = HashMap::new();
+        let mut flop_board_hand = [0, 0, initial_board[0], initial_board[1], initial_board[2]];
+
+        let flop_board_key = get_key(initial_board);
+
+        let mut flop_hands: Vec<Combination> = vec![];
+        let mut index_count: usize = 0;
+        for hand in self.starting_combinations.iter() {
+            flop_board_hand[0] = hand.hand[0];
+            flop_board_hand[1] = hand.hand[1];
+
+            let hand_index = self.flop_indexer.get_index(&flop_board_hand);
+            if !canon_index_to_range_index.contains_key(&hand_index) {
+                canon_index_to_range_index.insert(hand_index, index_count);
+                flop_hands.push(hand.clone());
+            } else {
+                let canon_location = canon_index_to_range_index[&hand_index];
+                flop_hands[canon_location].weight += 1;
+                let mut combo = hand.clone();
+                combo.canon_index = flop_hands[canon_location].raw_index;
+                combo.weight = 0;
+                flop_hands.push(combo);
+            }
+            index_count += 1;
+        }
+
+        let mut flop_hand_mapping = vec![0; 51 * 52 + 51];
+
+        for (i, hand) in flop_hands.iter().enumerate() {
+            if hand.weight != 0 {
+                flop_hand_mapping[hand.raw_index] = i;
+            }
+        }
+
+        for hand in flop_hands.iter() {
+            if hand.weight == 0 {
+                flop_hand_mapping[hand.raw_index] = flop_hand_mapping[hand.canon_index];
+            }
+        }
+
+        self.add_range_for_board(flop_hands, flop_board_key);
+        self.reach_probs_mapping
+            .insert(flop_board_key, flop_hand_mapping);
+
         for turn in 0u8..52 {
             if check_card_overlap(turn, initial_board) {
                 continue;
@@ -79,28 +133,57 @@ impl RangeManager {
 
             turn_board[3] = turn;
 
+            let mut turn_board_hand = [
+                0,
+                0,
+                initial_board[0],
+                initial_board[1],
+                initial_board[2],
+                turn,
+            ];
+
             let turn_board_key = get_key(&turn_board);
 
             let mut turn_hands: Vec<Combination> = vec![];
 
+            index_count = 0;
+            canon_index_to_range_index.clear();
             for hand in self.starting_combinations.iter() {
                 if check_hand_overlap(hand.hand, &turn_board) {
                     continue;
                 }
 
-                turn_hands.push(Combination::new(hand.hand, 0, hand.combos));
+                turn_board_hand[0] = hand.hand[0];
+                turn_board_hand[1] = hand.hand[1];
+
+                let hand_index = self.turn_indexer.get_index(&turn_board_hand);
+                if !canon_index_to_range_index.contains_key(&hand_index) {
+                    canon_index_to_range_index.insert(hand_index, index_count);
+                    turn_hands.push(hand.clone());
+                } else {
+                    let canon_location = canon_index_to_range_index[&hand_index];
+                    turn_hands[canon_location].weight += 1;
+                    let mut combo = hand.clone();
+                    combo.canon_index = turn_hands[canon_location].raw_index;
+                    combo.weight = 0;
+                    turn_hands.push(combo);
+                }
+                index_count += 1;
             }
 
-            let mut turn_reach_probs_mapping = vec![0; turn_hands.len()];
+            let mut turn_reach_probs_mapping = vec![0; 51 * 52 + 51];
 
-            // do forward reach probs mapping to this turn card
-            let mut j = 0;
-            for i in 0..turn_hands.len() {
-                while turn_hands[i] != self.starting_combinations[j] {
-                    j += 1;
+            for (i, hand) in turn_hands.iter().enumerate() {
+                if hand.weight != 0 {
+                    turn_reach_probs_mapping[hand.raw_index] = i;
                 }
+            }
 
-                turn_reach_probs_mapping[i] = j;
+            for hand in turn_hands.iter() {
+                if hand.weight == 0 {
+                    turn_reach_probs_mapping[hand.raw_index] =
+                        turn_reach_probs_mapping[hand.canon_index];
+                }
             }
 
             self.reach_probs_mapping
@@ -118,25 +201,50 @@ impl RangeManager {
 
                 let mut river_hands: Vec<Combination> = vec![];
 
+                let mut river_board_hand = [
+                    0,
+                    0,
+                    initial_board[0],
+                    initial_board[1],
+                    initial_board[2],
+                    turn,
+                    river,
+                ];
                 let mut board_hand = Hand::default();
                 for board_card in river_board.iter() {
                     board_hand += CARDS[usize::from(*board_card)];
                 }
 
+                index_count = 0;
+                canon_index_to_range_index.clear();
                 for hand in turn_hands.iter() {
                     if check_hand_overlap(hand.hand, &river_board) {
                         continue;
                     }
 
+                    river_board_hand[0] = hand.hand[0];
+                    river_board_hand[1] = hand.hand[1];
+
+                    self.river_indexer.get_index(&river_board_hand);
+
                     let river_hand = board_hand
                         + CARDS[usize::from(hand.hand[0])]
                         + CARDS[usize::from(hand.hand[1])];
 
-                    river_hands.push(Combination::new(
-                        hand.hand,
-                        evaluate(&river_hand),
-                        hand.combos,
-                    ));
+                    let mut combo = Combination::new(hand.hand, evaluate(&river_hand), hand.combos);
+
+                    let hand_index = self.river_indexer.get_index(&river_board_hand);
+                    if !canon_index_to_range_index.contains_key(&hand_index) {
+                        canon_index_to_range_index.insert(hand_index, index_count);
+                        river_hands.push(combo);
+                    } else {
+                        let canon_location = canon_index_to_range_index[&hand_index];
+                        river_hands[canon_location].weight += 1;
+                        combo.canon_index = river_hands[canon_location].raw_index;
+                        combo.weight = 0;
+                        river_hands.push(combo);
+                    }
+                    index_count += 1;
                 }
 
                 // do forward reach probs mapping to this river card, then quick sort the mapping and hands together
@@ -290,6 +398,10 @@ impl RangeManager {
         utility.iter().zip(map.iter()).for_each(|(util, map_idx)| {
             mapped_utility[*map_idx] += util;
         });
+    }
+
+    pub fn get_reach_probs_mapping(&self, board: &Board) -> &Vec<usize> {
+        return &self.reach_probs_mapping[&get_key(board)];
     }
 }
 

@@ -73,13 +73,27 @@ impl CfrNode for ChanceNode {
                 });
         }
 
+        let hands = traversal.get_range_for_active_player(board);
+
         if self.street == 1 {
-            for hand in result.iter_mut() {
-                *hand /= 45.0
-            }
+            result.iter_mut().zip(hands.iter()).for_each(|(ev, hand)| {
+                if hand.weight != 0 {
+                    *ev /= 45.0 * f32::from(hand.weight);
+                }
+            });
         } else {
-            for hand in result.iter_mut() {
-                *hand /= 44.0
+            result.iter_mut().zip(hands.iter()).for_each(|(ev, hand)| {
+                if hand.weight != 0 {
+                    *ev /= 44.0 * f32::from(hand.weight);
+                }
+            });
+        }
+
+        let mapping = traversal.get_mapping_for_active_player(board);
+
+        for i in 0..hands.len() {
+            if hands[i].weight == 0 {
+                result[i] = result[mapping[hands[i].canon_index]];
             }
         }
 
@@ -93,6 +107,7 @@ impl CfrNode for ChanceNode {
         board: &Board,
     ) -> Vec<f32> {
         let mut result = vec![0.0; traversal.get_num_hands_for_traverser(board)];
+
         let next_boards: Vec<Board> = self
             .next_cards
             .iter()
@@ -142,13 +157,27 @@ impl CfrNode for ChanceNode {
                 });
         }
 
+        let hands = traversal.get_range_for_active_player(board);
+
         if self.street == 1 {
-            for hand in result.iter_mut() {
-                *hand /= 45.0
-            }
+            result.iter_mut().zip(hands.iter()).for_each(|(ev, hand)| {
+                if hand.weight != 0 {
+                    *ev /= 45.0 * f32::from(hand.weight);
+                }
+            });
         } else {
-            for hand in result.iter_mut() {
-                *hand /= 44.0
+            result.iter_mut().zip(hands.iter()).for_each(|(ev, hand)| {
+                if hand.weight != 0 {
+                    *ev /= 44.0 * f32::from(hand.weight);
+                }
+            });
+        }
+
+        let mapping = traversal.get_mapping_for_active_player(board);
+
+        for i in 0..hands.len() {
+            if hands[i].weight == 0 {
+                result[i] = result[mapping[hands[i].canon_index]];
             }
         }
 

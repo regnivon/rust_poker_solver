@@ -9,11 +9,22 @@ pub struct Combination {
     pub hand: Hand,
     pub rank: u16,
     pub combos: f32,
+    pub weight: i8,
+    pub raw_index: usize,
+    pub canon_index: usize,
 }
 
 impl Combination {
     pub fn new(hand: Hand, rank: u16, combos: f32) -> Self {
-        Combination { hand, rank, combos }
+        let raw_index = usize::from(hand[0]) * 52 + usize::from(hand[1]);
+        Combination {
+            hand,
+            rank,
+            combos,
+            weight: 1,
+            raw_index,
+            canon_index: raw_index,
+        }
     }
 }
 

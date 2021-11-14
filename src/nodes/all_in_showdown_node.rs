@@ -46,6 +46,7 @@ impl AllInShowdownNode {
         board: &Board,
     ) -> Vec<f32> {
         let mut utility = vec![0.0; traversal.get_num_hands_for_traverser(board)];
+        let hands = traversal.get_range_for_active_player(board);
 
         if self.street == 1 {
             for turn in 0..52 {
@@ -71,12 +72,31 @@ impl AllInShowdownNode {
                         }
                     }
                     next_board[4] = 52;
+                    let mapping = traversal.get_mapping_for_active_player(&next_board);
+                    let turn_hands = traversal.get_range_for_active_player(&next_board);
+
+                    for i in 0..turn_hands.len() {
+                        if turn_hands[i].weight != 0 {
+                            turn_utility[i] /= f32::from(turn_hands[i].weight);
+                        }
+                    }
+
+                    for i in 0..turn_hands.len() {
+                        if turn_hands[i].weight == 0 {
+                            turn_utility[i] = turn_utility[mapping[turn_hands[i].canon_index]];
+                        }
+                    }
+
+                    next_board[4] = 52;
                     traversal.map_utility_backwards(&next_board, &turn_utility, &mut utility)
                 }
             }
-            for val in utility.iter_mut() {
-                *val /= 990.0;
-            }
+            utility
+                .iter_mut()
+                .zip(hands.iter())
+                .for_each(|(val, hand)| {
+                    *val /= 990.0 * f32::from(hand.weight);
+                });
         } else {
             for river in 0..52 {
                 if !check_card_overlap(river, board) {
@@ -89,8 +109,19 @@ impl AllInShowdownNode {
                     traversal.map_utility_backwards(&next_board, &river_utility, &mut utility);
                 }
             }
-            for val in utility.iter_mut() {
-                *val /= 44.0
+            utility
+                .iter_mut()
+                .zip(hands.iter())
+                .for_each(|(val, hand)| {
+                    *val /= 44.0 * f32::from(hand.weight);
+                });
+        }
+
+        let mapping = traversal.get_mapping_for_active_player(board);
+
+        for i in 0..hands.len() {
+            if hands[i].weight == 0 {
+                utility[i] = utility[mapping[hands[i].canon_index]];
             }
         }
 
