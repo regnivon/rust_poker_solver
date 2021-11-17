@@ -72,20 +72,18 @@ impl AllInShowdownNode {
                         }
                     }
                     next_board[4] = 52;
-                    let mapping = traversal.get_mapping_for_active_player(&next_board);
                     let turn_hands = traversal.get_range_for_active_player(&next_board);
 
-                    for i in 0..turn_hands.len() {
-                        if turn_hands[i].weight != 0 {
-                            turn_utility[i] /= f32::from(turn_hands[i].weight);
-                        }
-                    }
+                    turn_utility
+                        .iter_mut()
+                        .zip(turn_hands.iter())
+                        .for_each(|(util, hand)| {
+                            if hand.weight != 0 {
+                                *util /= f32::from(hand.weight);
+                            }
+                        });
 
-                    for i in 0..turn_hands.len() {
-                        if turn_hands[i].weight == 0 {
-                            turn_utility[i] = turn_utility[mapping[turn_hands[i].canon_index]];
-                        }
-                    }
+                    traversal.merge_canonical_utilities(&next_board, &mut turn_utility);
 
                     next_board[4] = 52;
                     traversal.map_utility_backwards(&next_board, &turn_utility, &mut utility)
@@ -117,13 +115,7 @@ impl AllInShowdownNode {
                 });
         }
 
-        let mapping = traversal.get_mapping_for_active_player(board);
-
-        for i in 0..hands.len() {
-            if hands[i].weight == 0 {
-                utility[i] = utility[mapping[hands[i].canon_index]];
-            }
-        }
+        traversal.merge_canonical_utilities(&board, &mut utility);
 
         utility
     }

@@ -96,13 +96,7 @@ impl CfrNode for ChanceNode {
             });
         }
 
-        let mapping = traversal.get_mapping_for_active_player(board);
-
-        for i in 0..hands.len() {
-            if hands[i].weight == 0 {
-                result[i] = result[mapping[hands[i].canon_index]];
-            }
-        }
+        traversal.merge_canonical_utilities(board, &mut result);
 
         result
     }
@@ -180,13 +174,7 @@ impl CfrNode for ChanceNode {
             });
         }
 
-        let mapping = traversal.get_mapping_for_active_player(board);
-
-        for i in 0..hands.len() {
-            if hands[i].weight == 0 {
-                result[i] = result[mapping[hands[i].canon_index]];
-            }
-        }
+        traversal.merge_canonical_utilities(board, &mut result);
 
         result
     }

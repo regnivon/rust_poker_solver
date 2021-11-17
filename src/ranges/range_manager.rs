@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
+use enum_dispatch::enum_dispatch;
 use rust_poker::hand_evaluator::{evaluate, Hand, CARDS};
-use rust_poker::{HandIndex, HandIndexer};
+use rust_poker::HandIndexer;
 
 use super::{
     combination::{Board, Combination},
@@ -28,8 +29,26 @@ fn get_key(board: &Board) -> u64 {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct RangeManager {
+#[enum_dispatch]
+pub trait RangeManager {
+    fn merge_canonical_utilities(&self, board: &Board, utility: &mut Vec<f32>);
+    fn map_utility_backwards(
+        &self,
+        new_board: &Board,
+        utility: &[f32],
+        mapped_utility: &mut Vec<f32>,
+    );
+    fn get_next_reach_probs(&self, new_board: &Board, opp_reach_probs: &[f32]) -> Vec<f32>;
+    fn get_range_for_board(&self, board: &Board) -> &Vec<Combination>;
+    fn get_reach_probs_mapping(&self, board: &Board) -> &Vec<usize>;
+}
+
+#[enum_dispatch(RangeManager)]
+pub enum RangeManagers {
+    IsomorphicRangeManager,
+}
+
+pub struct IsomorphicRangeManager {
     starting_combinations: Vec<Combination>,
     ranges: HashMap<u64, Vec<Combination>>,
     reach_probs_mapping: HashMap<u64, Vec<usize>>,
@@ -39,9 +58,9 @@ pub struct RangeManager {
 }
 
 // TODO: Track where my hand is in opponents range for terminal eval
-impl RangeManager {
+impl IsomorphicRangeManager {
     pub fn new(starting_combinations: Vec<Combination>, initial_board: Board) -> Self {
-        let mut rm = RangeManager {
+        let mut rm = IsomorphicRangeManager {
             starting_combinations,
             ranges: HashMap::new(),
             reach_probs_mapping: HashMap::new(),
@@ -361,13 +380,15 @@ impl RangeManager {
     fn add_range_for_board(&mut self, range: Vec<Combination>, board_key: u64) {
         self.ranges.insert(board_key, range);
     }
+}
 
-    pub fn get_range_for_board(&self, board: &Board) -> &Vec<Combination> {
+impl RangeManager for IsomorphicRangeManager {
+    fn get_range_for_board(&self, board: &Board) -> &Vec<Combination> {
         let board_key = get_key(board);
         self.ranges.get(&board_key).unwrap()
     }
 
-    pub fn get_next_reach_probs(&self, new_board: &Board, opp_reach_probs: &[f32]) -> Vec<f32> {
+    fn get_next_reach_probs(&self, new_board: &Board, opp_reach_probs: &[f32]) -> Vec<f32> {
         let board_key = get_key(new_board);
         let next_hands = &self.ranges[&board_key];
 
@@ -392,7 +413,7 @@ impl RangeManager {
         new_reach_probs
     }
 
-    pub fn map_utility_backwards(
+    fn map_utility_backwards(
         &self,
         new_board: &Board,
         utility: &[f32],
@@ -418,7 +439,19 @@ impl RangeManager {
             });
     }
 
-    pub fn get_reach_probs_mapping(&self, board: &Board) -> &Vec<usize> {
+    fn merge_canonical_utilities(&self, board: &Board, utility: &mut Vec<f32>) {
+        let board_key = get_key(board);
+        let mapping = &self.reach_probs_mapping[&board_key];
+        let hands = &self.ranges[&board_key];
+
+        for i in 0..hands.len() {
+            if hands[i].weight == 0 {
+                utility[i] = utility[mapping[hands[i].canon_index]];
+            }
+        }
+    }
+
+    fn get_reach_probs_mapping(&self, board: &Board) -> &Vec<usize> {
         return &self.reach_probs_mapping[&get_key(board)];
     }
 }

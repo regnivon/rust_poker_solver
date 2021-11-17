@@ -1,18 +1,18 @@
 use crate::ranges::{
     combination::{Board, Combination},
-    range_manager::RangeManager,
+    range_manager::{RangeManager, RangeManagers},
 };
 
 #[derive(Debug, Default)]
 pub struct Traversal {
-    oop_rm: RangeManager,
-    ip_rm: RangeManager,
+    oop_rm: RangeManagers,
+    ip_rm: RangeManagers,
     pub traverser: u8,
     pub iteration: u32,
 }
 
 impl Traversal {
-    pub fn new(oop_rm: RangeManager, ip_rm: RangeManager) -> Self {
+    pub fn new(oop_rm: RangeManagers, ip_rm: RangeManagers) -> Self {
         Self {
             oop_rm,
             ip_rm,
@@ -20,6 +20,7 @@ impl Traversal {
             iteration: 0,
         }
     }
+    
     pub fn get_range_for_active_player(&self, board: &Board) -> &Vec<Combination> {
         if self.traverser == 1 {
             return self.ip_rm.get_range_for_board(board);
@@ -75,5 +76,12 @@ impl Traversal {
             return self.oop_rm.get_reach_probs_mapping(board);
         }
         self.ip_rm.get_reach_probs_mapping(board)
+    }
+
+    pub fn merge_canonical_utilities(&self, board: &Board, utility: &mut Vec<f32>) {
+        if self.traverser == 1 {
+            return self.oop_rm.merge_canonical_utilities(board, utility);
+        }
+        self.ip_rm.merge_canonical_utilities(board, utility)
     }
 }
