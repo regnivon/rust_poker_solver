@@ -8,7 +8,7 @@ use crate::{
         combination::Board,
         utility::{
             board_has_turn, build_initial_suit_groups, build_next_suit_groups, check_card_overlap,
-            get_rank, get_suit,
+            get_suit,
         },
     },
 };

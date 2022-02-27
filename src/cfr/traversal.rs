@@ -3,7 +3,6 @@ use crate::ranges::{
     range_manager::{RangeManager, RangeManagers},
 };
 
-#[derive(Debug, Default)]
 pub struct Traversal {
     oop_rm: RangeManagers,
     ip_rm: RangeManagers,
@@ -69,13 +68,6 @@ impl Traversal {
         }
         self.ip_rm
             .map_utility_backwards(new_board, utility, mapped_utility)
-    }
-
-    pub fn get_mapping_for_active_player(&self, board: &Board) -> &Vec<usize> {
-        if self.traverser == 1 {
-            return self.oop_rm.get_reach_probs_mapping(board);
-        }
-        self.ip_rm.get_reach_probs_mapping(board)
     }
 
     pub fn merge_canonical_utilities(&self, board: &Board, utility: &mut Vec<f32>) {

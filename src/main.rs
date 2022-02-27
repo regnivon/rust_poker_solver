@@ -8,7 +8,7 @@ use crate::{
     cfr::{game::Game, game_params::GameParams, traversal::Traversal},
     ranges::{
         combination::Board,
-        range_manager::{IsomorphicRangeManager, RangeManagers},
+        range_manager::{IsomorphicRangeManager, RangeManagers, DefaultRangeManager},
         utility::{
             build_initial_suit_groups, card_to_number, construct_starting_range_from_string,
         },
@@ -28,10 +28,10 @@ fn run_trainer() {
         52, //card_to_number("3d".to_string()),
         52, //card_to_number("2c".to_string()),
     ];
-    // let starting_combinations = construct_starting_range_from_string("random".to_string(), &board);
-    // let starting_combinations2 = construct_starting_range_from_string("random".to_string(), &board);
-    let starting_combinations = construct_starting_range_from_string("TT,99,88,77,66,55,44,33,22,ATs,A9s,A8s,A7s,A6s,A5s,A4s,A3s,A2s,KTs,K9s,K8s,K7s,K6s,K5s,K4s,K3s,K2s,QTs,Q9s,Q8s,Q7s,Q6s,Q5s,Q4s,Q3s,Q2s,JTs,J9s,J8s,J7s,J6s,J5s,J4s,T9s,T8s,T7s,T6s,T5s,T4s,98s,97s,96s,95s,94s,87s,86s,85s,76s,75s,74s,65s,65s,64s,54s,43s,AJo,ATo,A9o,A8o,A7o,A6o,A5o,A4o,KJo,KTo,QJo,QTo,JTo".to_string(), &board);
-    let starting_combinations2 = construct_starting_range_from_string("TT,99,88,77,66,55,44,33,22,ATs,A9s,A8s,A7s,A6s,A5s,A4s,A3s,A2s,KTs,K9s,K8s,K7s,K6s,K5s,K4s,K3s,K2s,QTs,Q9s,Q8s,Q7s,Q6s,Q5s,Q4s,Q3s,Q2s,JTs,J9s,J8s,J7s,J6s,J5s,J4s,T9s,T8s,T7s,T6s,T5s,T4s,98s,97s,96s,95s,94s,87s,86s,85s,76s,75s,74s,65s,65s,64s,54s,43s,AJo,ATo,A9o,A8o,A7o,A6o,A5o,A4o,KJo,KTo,QJo,QTo,JTo".to_string(), &board);
+    let starting_combinations = construct_starting_range_from_string("random".to_string(), &board);
+    let starting_combinations2 = construct_starting_range_from_string("random".to_string(), &board);
+    // let starting_combinations = construct_starting_range_from_string("TT,99,88,77,66,55,44,33,22,ATs,A9s,A8s,A7s,A6s,A5s,A4s,A3s,A2s,KTs,K9s,K8s,K7s,K6s,K5s,K4s,K3s,K2s,QTs,Q9s,Q8s,Q7s,Q6s,Q5s,Q4s,Q3s,Q2s,JTs,J9s,J8s,J7s,J6s,J5s,J4s,T9s,T8s,T7s,T6s,T5s,T4s,98s,97s,96s,95s,94s,87s,86s,85s,76s,75s,74s,65s,65s,64s,54s,43s,AJo,ATo,A9o,A8o,A7o,A6o,A5o,A4o,KJo,KTo,QJo,QTo,JTo".to_string(), &board);
+    // let starting_combinations2 = construct_starting_range_from_string("TT,99,88,77,66,55,44,33,22,ATs,A9s,A8s,A7s,A6s,A5s,A4s,A3s,A2s,KTs,K9s,K8s,K7s,K6s,K5s,K4s,K3s,K2s,QTs,Q9s,Q8s,Q7s,Q6s,Q5s,Q4s,Q3s,Q2s,JTs,J9s,J8s,J7s,J6s,J5s,J4s,T9s,T8s,T7s,T6s,T5s,T4s,98s,97s,96s,95s,94s,87s,86s,85s,76s,75s,74s,65s,65s,64s,54s,43s,AJo,ATo,A9o,A8o,A7o,A6o,A5o,A4o,KJo,KTo,QJo,QTo,JTo".to_string(), &board);
 
     let sg = build_initial_suit_groups(&board);
     let mut iso = false;
@@ -43,13 +43,13 @@ fn run_trainer() {
     let rm = if iso {
         RangeManagers::from(IsomorphicRangeManager::new(starting_combinations, board))
     } else {
-        RangeManagers::from(IsomorphicRangeManager::new(starting_combinations, board))
+        RangeManagers::from(DefaultRangeManager::new(starting_combinations, board))
     };
 
     let rm2 = if iso {
         RangeManagers::from(IsomorphicRangeManager::new(starting_combinations2, board))
     } else {
-        RangeManagers::from(IsomorphicRangeManager::new(starting_combinations2, board))
+        RangeManagers::from(DefaultRangeManager::new(starting_combinations2, board))
     };
 
     let params = GameParams::new(

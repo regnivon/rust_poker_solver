@@ -13,7 +13,6 @@ use crate::{
 
 use super::{game_params::GameParams, traversal::Traversal};
 
-#[derive(Debug, Default)]
 pub struct Game {
     traversal: Traversal,
     root: Node,
