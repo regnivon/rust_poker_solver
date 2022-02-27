@@ -3,6 +3,7 @@ use crate::ranges::{
     range_manager::RangeManager,
 };
 
+#[derive(Debug, Default)]
 pub struct Traversal {
     oop_rm: RangeManager,
     ip_rm: RangeManager,

@@ -1,3 +1,4 @@
+#[derive(Debug, Default)]
 pub struct GameParams {
     pub parallel_street: u8,
     pub starting_pot: f32,

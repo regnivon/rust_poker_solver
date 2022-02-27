@@ -13,6 +13,7 @@ use crate::{
 
 use super::{game_params::GameParams, traversal::Traversal};
 
+#[derive(Debug, Default)]
 pub struct Game {
     traversal: Traversal,
     root: Node,
@@ -40,8 +41,14 @@ impl Game {
             .traversal
             .get_range_for_active_player(&self.starting_board);
 
-        let ip = vec![1.0; ip_range.len()];
-        let oop = vec![1.0; oop_range.len()];
+        let ip: Vec<f32> = ip_range
+            .iter()
+            .map(|combo| combo.combos)
+            .collect();
+        let oop: Vec<f32> = oop_range
+            .iter()
+            .map(|combo| combo.combos)
+            .collect();
 
         let ip_relative_probs = range_relative_probabilities(ip_range, oop_range);
         let oop_relative_probs = range_relative_probabilities(oop_range, ip_range);

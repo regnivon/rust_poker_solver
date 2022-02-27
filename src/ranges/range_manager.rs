@@ -27,6 +27,7 @@ fn get_key(board: &Board) -> u64 {
     }
 }
 
+#[derive(Debug, Default)]
 pub struct RangeManager {
     starting_combinations: Vec<Combination>,
     ranges: HashMap<u64, Vec<Combination>>,

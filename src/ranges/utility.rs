@@ -30,11 +30,12 @@ pub fn construct_starting_range_from_string(
     let starting_range = HandRange::from_strings([range_string].to_vec());
     let mut starting_combinations = vec![];
     for hand in starting_range[0].hands.iter() {
-        let combo = Combination::new([hand.0, hand.1], 0, 1.0);
+        let combo = Combination::new([hand.0, hand.1], 0, f32::from(hand.2) / 100.0);
         if !check_hand_overlap(combo.hand, board) {
             starting_combinations.push(combo)
         }
     }
+
     starting_combinations
 }
 
