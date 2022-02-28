@@ -45,7 +45,8 @@ pub trait RangeManager {
 
 #[enum_dispatch(RangeManager)]
 pub enum RangeManagers {
-    IsomorphicRangeManager, DefaultRangeManager
+    IsomorphicRangeManager,
+    DefaultRangeManager,
 }
 
 pub struct IsomorphicRangeManager {
@@ -684,7 +685,7 @@ impl DefaultRangeManager {
 
     fn add_range_for_board(&mut self, range: Vec<Combination>, board_key: u64) {
         self.ranges.insert(board_key, range);
-    } 
+    }
 }
 
 impl RangeManager for DefaultRangeManager {

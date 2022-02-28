@@ -19,7 +19,7 @@ impl Traversal {
             iteration: 0,
         }
     }
-    
+
     pub fn get_range_for_active_player(&self, board: &Board) -> &Vec<Combination> {
         if self.traverser == 1 {
             return self.ip_rm.get_range_for_board(board);
