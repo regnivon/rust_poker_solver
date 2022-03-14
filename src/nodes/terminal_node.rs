@@ -1,9 +1,12 @@
-use super::node::CfrNode;
 use crate::{
     cfr::traversal::Traversal,
     ranges::combination::{Board, Combination},
 };
 
+use crate::nodes::node::{CfrNode, NodeResult};
+use crate::ranges::utility::hand_to_string;
+
+#[derive(Debug)]
 pub struct TerminalNode {
     win_utility: f32,
     player_node: u8,
@@ -20,12 +23,16 @@ impl CfrNode for TerminalNode {
     }
 
     fn best_response(
-        &self,
+        &mut self,
         traversal: &Traversal,
         op_reach_prob: &[f32],
         board: &Board,
     ) -> Vec<f32> {
         self.dispatch_utility(traversal, op_reach_prob, board)
+    }
+
+    fn output_results(&self) -> Option<NodeResult> {
+        None
     }
 }
 

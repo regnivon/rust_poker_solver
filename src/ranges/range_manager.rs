@@ -41,6 +41,7 @@ pub trait RangeManager {
     fn get_next_reach_probs(&self, new_board: &Board, opp_reach_probs: &[f32]) -> Vec<f32>;
     fn get_range_for_board(&self, board: &Board) -> &Vec<Combination>;
     fn get_reach_probs_mapping(&self, board: &Board) -> &Vec<usize>;
+    fn get_starting_combinations(&self) -> Vec<Combination>;
 }
 
 #[enum_dispatch(RangeManager)]
@@ -384,34 +385,16 @@ impl IsomorphicRangeManager {
 }
 
 impl RangeManager for IsomorphicRangeManager {
-    fn get_range_for_board(&self, board: &Board) -> &Vec<Combination> {
+    fn merge_canonical_utilities(&self, board: &Board, utility: &mut Vec<f32>) {
         let board_key = get_key(board);
-        self.ranges.get(&board_key).unwrap()
-    }
+        let mapping = &self.reach_probs_mapping[&board_key];
+        let hands = &self.ranges[&board_key];
 
-    fn get_next_reach_probs(&self, new_board: &Board, opp_reach_probs: &[f32]) -> Vec<f32> {
-        let board_key = get_key(new_board);
-        let next_hands = &self.ranges[&board_key];
-
-        let mut last_board = new_board.clone();
-        if last_board[4] == 52 {
-            last_board[3] = 52;
-        } else {
-            last_board[4] = 52;
+        for i in 0..hands.len() {
+            if hands[i].weight == 0 {
+                utility[i] = utility[mapping[hands[i].canon_index]];
+            }
         }
-        let last_board_key = get_key(&last_board);
-        let map = &self.reach_probs_mapping[&last_board_key];
-
-        let mut new_reach_probs = vec![0.0; next_hands.len()];
-
-        new_reach_probs
-            .iter_mut()
-            .zip(next_hands.iter())
-            .for_each(|(new_reach, next_hand)| {
-                *new_reach = opp_reach_probs[map[next_hand.raw_index]];
-            });
-
-        new_reach_probs
     }
 
     fn map_utility_backwards(
@@ -440,20 +423,42 @@ impl RangeManager for IsomorphicRangeManager {
             });
     }
 
-    fn merge_canonical_utilities(&self, board: &Board, utility: &mut Vec<f32>) {
-        let board_key = get_key(board);
-        let mapping = &self.reach_probs_mapping[&board_key];
-        let hands = &self.ranges[&board_key];
+    fn get_next_reach_probs(&self, new_board: &Board, opp_reach_probs: &[f32]) -> Vec<f32> {
+        let board_key = get_key(new_board);
+        let next_hands = &self.ranges[&board_key];
 
-        for i in 0..hands.len() {
-            if hands[i].weight == 0 {
-                utility[i] = utility[mapping[hands[i].canon_index]];
-            }
+        let mut last_board = new_board.clone();
+        if last_board[4] == 52 {
+            last_board[3] = 52;
+        } else {
+            last_board[4] = 52;
         }
+        let last_board_key = get_key(&last_board);
+        let map = &self.reach_probs_mapping[&last_board_key];
+
+        let mut new_reach_probs = vec![0.0; next_hands.len()];
+
+        new_reach_probs
+            .iter_mut()
+            .zip(next_hands.iter())
+            .for_each(|(new_reach, next_hand)| {
+                *new_reach = opp_reach_probs[map[next_hand.raw_index]];
+            });
+
+        new_reach_probs
+    }
+
+    fn get_range_for_board(&self, board: &Board) -> &Vec<Combination> {
+        let board_key = get_key(board);
+        self.ranges.get(&board_key).unwrap()
     }
 
     fn get_reach_probs_mapping(&self, board: &Board) -> &Vec<usize> {
         return &self.reach_probs_mapping[&get_key(board)];
+    }
+
+    fn get_starting_combinations(&self) -> Vec<Combination> {
+        self.starting_combinations.clone()
     }
 }
 
@@ -707,15 +712,6 @@ impl RangeManager for DefaultRangeManager {
         });
     }
 
-    fn get_reach_probs_mapping(&self, board: &Board) -> &Vec<usize> {
-        return &self.reach_probs_mapping[&get_key(board)];
-    }
-
-    fn get_range_for_board(&self, board: &Board) -> &Vec<Combination> {
-        let board_key = get_key(board);
-        self.ranges.get(&board_key).unwrap()
-    }
-
     fn get_next_reach_probs(&self, new_board: &Board, opp_reach_probs: &[f32]) -> Vec<f32> {
         let board_key = get_key(new_board);
         let map = &self.reach_probs_mapping[&board_key];
@@ -730,6 +726,19 @@ impl RangeManager for DefaultRangeManager {
             });
 
         new_reach_probs
+    }
+
+    fn get_range_for_board(&self, board: &Board) -> &Vec<Combination> {
+        let board_key = get_key(board);
+        self.ranges.get(&board_key).unwrap()
+    }
+
+    fn get_reach_probs_mapping(&self, board: &Board) -> &Vec<usize> {
+        return &self.reach_probs_mapping[&get_key(board)];
+    }
+
+    fn get_starting_combinations(&self) -> Vec<Combination> {
+        self.starting_combinations.clone()
     }
 }
 

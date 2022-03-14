@@ -1,9 +1,9 @@
+use crate::nodes::node::{CfrNode, NodeResult};
+use crate::ranges::utility::hand_to_string;
 use crate::{
     cfr::traversal::Traversal,
     ranges::combination::{Board, Range},
 };
-
-use super::node::CfrNode;
 
 pub fn showdown(hands: &Range, op_reach_prob: &[f32], win_utility: f32) -> Vec<f32> {
     let mut sum = 0.0;
@@ -66,6 +66,7 @@ pub fn showdown(hands: &Range, op_reach_prob: &[f32], win_utility: f32) -> Vec<f
     utility
 }
 
+#[derive(Debug)]
 pub struct ShowdownNode {
     win_utility: f32,
 }
@@ -82,13 +83,17 @@ impl CfrNode for ShowdownNode {
     }
 
     fn best_response(
-        &self,
+        &mut self,
         traversal: &Traversal,
         op_reach_prob: &[f32],
         board: &Board,
     ) -> Vec<f32> {
         let opp_hands = traversal.get_range_for_opponent(board);
         showdown(opp_hands, op_reach_prob, self.win_utility)
+    }
+
+    fn output_results(&self) -> Option<NodeResult> {
+        None
     }
 }
 

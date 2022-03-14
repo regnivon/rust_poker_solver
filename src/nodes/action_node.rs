@@ -1,6 +1,6 @@
-use crate::{cfr::traversal::Traversal, ranges::combination::Board};
-
 use super::node::{CfrNode, Node};
+use crate::nodes::node::{NodeResult, NodeResultType};
+use crate::{cfr::traversal::Traversal, ranges::combination::Board};
 
 pub struct ActionNode {
     pub player_node: u8,
@@ -12,6 +12,7 @@ pub struct ActionNode {
     next_nodes: Vec<Node>,
     regret_accumulator: Vec<f32>,
     strategy_accumulator: Vec<f32>,
+    node_ev: Option<Vec<f32>>,
 }
 
 impl CfrNode for ActionNode {
@@ -31,17 +32,21 @@ impl CfrNode for ActionNode {
     }
 
     fn best_response(
-        &self,
+        &mut self,
         traversal: &Traversal,
         op_reach_prob: &[f32],
         board: &Board,
     ) -> Vec<f32> {
         if self.player_node == traversal.traverser {
             let mut best_ev = vec![0.0; self.num_hands];
+            let mut node_evs = vec![];
             for action in 0..self.num_actions {
                 let next_ev =
                     self.next_nodes[action].best_response(traversal, op_reach_prob, board);
 
+                if traversal.persist_evs {
+                    node_evs.extend_from_slice(&next_ev)
+                }
                 best_ev
                     .iter_mut()
                     .zip(next_ev.iter())
@@ -50,6 +55,33 @@ impl CfrNode for ActionNode {
                             *best = *next;
                         }
                     });
+            }
+            if traversal.persist_evs {
+                let opp_hands = traversal.get_range_for_opponent(board);
+                let mut card_removal = [0.0; 52];
+                let mut probability_sum = 0.0;
+
+                op_reach_prob
+                    .iter()
+                    .zip(opp_hands.iter())
+                    .for_each(|(prob, hand)| {
+                        if *prob > 0.0 {
+                            probability_sum += prob;
+
+                            card_removal[usize::from(hand.hand[0])] += prob;
+                            card_removal[usize::from(hand.hand[1])] += prob;
+                        }
+                    });
+
+                for (i, ev) in node_evs.iter_mut().enumerate() {
+                    *ev /= probability_sum
+                        - card_removal[usize::from(opp_hands[i % opp_hands.len()].hand[0])]
+                        - card_removal[usize::from(opp_hands[i % opp_hands.len()].hand[1])]
+                        + op_reach_prob[i % opp_hands.len()];
+                    *ev += self.pot_size;
+                }
+
+                self.node_ev = Some(node_evs)
             }
             best_ev
         } else {
@@ -81,6 +113,20 @@ impl CfrNode for ActionNode {
             node_ev
         }
     }
+
+    fn output_results(&self) -> Option<NodeResult> {
+        Some(NodeResult {
+            node_type: NodeResultType::Action,
+            node_strategy: Some(self.get_average_strategy()),
+            node_ev: self.node_ev.clone(),
+            next_cards: None,
+            next_nodes: self
+                .next_nodes
+                .iter()
+                .filter_map(|node| node.output_results())
+                .collect(),
+        })
+    }
 }
 
 impl ActionNode {
@@ -101,6 +147,7 @@ impl ActionNode {
             next_nodes: vec![],
             regret_accumulator: vec![],
             strategy_accumulator: vec![],
+            node_ev: None,
         }
     }
 

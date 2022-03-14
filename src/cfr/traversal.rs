@@ -2,12 +2,43 @@ use crate::ranges::{
     combination::{Board, Combination},
     range_manager::{RangeManager, RangeManagers},
 };
+use crate::{
+    build_initial_suit_groups, construct_starting_range_from_string, DefaultRangeManager,
+    IsomorphicRangeManager,
+};
+
+pub fn build_traversal_from_ranges(board: Board, oop_range: &str, ip_range: &str) -> Traversal {
+    let oop_combinations = construct_starting_range_from_string(oop_range.to_string(), &board);
+    let ip_combinations = construct_starting_range_from_string(ip_range.to_string(), &board);
+
+    let sg = build_initial_suit_groups(&board);
+    let mut iso = false;
+    for suit in 0u8..4 {
+        if sg[usize::from(suit)] != suit {
+            iso = true;
+        }
+    }
+    let oop_rm = if iso {
+        RangeManagers::from(IsomorphicRangeManager::new(oop_combinations, board))
+    } else {
+        RangeManagers::from(DefaultRangeManager::new(oop_combinations, board))
+    };
+
+    let ip_rm = if iso {
+        RangeManagers::from(IsomorphicRangeManager::new(ip_combinations, board))
+    } else {
+        RangeManagers::from(DefaultRangeManager::new(ip_combinations, board))
+    };
+
+    Traversal::new(oop_rm, ip_rm)
+}
 
 pub struct Traversal {
-    oop_rm: RangeManagers,
-    ip_rm: RangeManagers,
+    pub oop_rm: RangeManagers,
+    pub ip_rm: RangeManagers,
     pub traverser: u8,
     pub iteration: u32,
+    pub persist_evs: bool,
 }
 
 impl Traversal {
@@ -17,6 +48,7 @@ impl Traversal {
             ip_rm,
             traverser: 0,
             iteration: 0,
+            persist_evs: false,
         }
     }
 

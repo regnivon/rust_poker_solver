@@ -1,3 +1,5 @@
+use futures_lite::StreamExt;
+use rust_poker::constants::{RANK_TO_CHAR, SUIT_TO_CHAR};
 use rust_poker::hand_range::HandRange;
 use rust_poker::hand_range::{char_to_rank, char_to_suit};
 
@@ -136,12 +138,27 @@ pub fn unblocked_hands(rng: &Range, opp_range: &Range) -> Vec<f32> {
     hand_counts
 }
 
+pub fn hand_to_string(h: &Hand) -> String {
+    format!("{}{}", number_to_card(h[0]), number_to_card(h[1]))
+}
+
 pub fn card_to_number(card: String) -> u8 {
     let chars: Vec<char> = card.chars().collect();
     let rank = char_to_rank(chars[0]);
     let suit = char_to_suit(chars[1]);
 
     4 * rank + suit
+}
+
+pub fn number_to_card(card: u8) -> String {
+    let rank = card >> 2;
+    let suit = card & 3;
+
+    let mut card_str = String::new();
+    card_str.push(RANK_TO_CHAR[usize::from(rank)]);
+    card_str.push(SUIT_TO_CHAR[usize::from(suit)]);
+
+    card_str
 }
 
 #[cfg(test)]

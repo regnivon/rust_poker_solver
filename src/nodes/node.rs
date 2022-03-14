@@ -5,9 +5,27 @@ use super::showdown_node::ShowdownNode;
 use super::terminal_node::TerminalNode;
 
 use enum_dispatch::enum_dispatch;
+use serde::{Deserialize, Serialize};
 
 use crate::cfr::traversal::Traversal;
 use crate::ranges::combination::Board;
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum NodeResultType {
+    Action,
+    Chance,
+}
+
+#[serde_with::skip_serializing_none]
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeResult {
+    pub node_type: NodeResultType,
+    pub node_strategy: Option<Vec<f32>>,
+    pub node_ev: Option<Vec<f32>>,
+    pub next_cards: Option<Vec<u8>>,
+    pub next_nodes: Vec<NodeResult>,
+}
 
 #[enum_dispatch]
 pub trait CfrNode {
@@ -18,18 +36,19 @@ pub trait CfrNode {
         board: &Board,
     ) -> Vec<f32>;
     fn best_response(
-        &self,
+        &mut self,
         traversal: &Traversal,
         op_reach_prob: &[f32],
         board: &Board,
     ) -> Vec<f32>;
+    fn output_results(&self) -> Option<NodeResult>;
 }
 
 #[enum_dispatch(CfrNode)]
 pub enum Node {
-    ActionNode,
-    ChanceNode,
-    ShowdownNode,
-    TerminalNode,
-    AllInShowdownNode,
+    ActionNode(ActionNode),
+    ChanceNode(ChanceNode),
+    ShowdownNode(ShowdownNode),
+    TerminalNode(TerminalNode),
+    AllInShowdownNode(AllInShowdownNode),
 }

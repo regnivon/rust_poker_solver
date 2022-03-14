@@ -15,6 +15,8 @@ use crate::{
     },
 };
 
+use crate::cfr::traversal::build_traversal_from_ranges;
+use crate::ranges::utility::number_to_card;
 use futures_lite::stream::StreamExt;
 use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
 use serde::{Deserialize, Serialize};
@@ -23,6 +25,7 @@ use std::str;
 #[derive(Default, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct SolutionConfig {
+    pub bucket_name: String,
     pub board: String,
     pub range: String,
     pub starting_pot: f32,
@@ -40,6 +43,56 @@ struct SolutionConfig {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let board: Board = [
+        card_to_number("kc".to_string()),
+        card_to_number("7h".to_string()),
+        card_to_number("2d".to_string()),
+        52, //card_to_number("3d".to_string()),
+        52, //card_to_number("2c".to_string()),
+    ];
+
+    let params = GameParams::new(
+        1,
+        60.0,
+        1000.0,
+        1.0,
+        0.75,
+        vec![vec![]],
+        vec![vec![0.75]],
+        vec![vec![0.75]],
+        vec![vec![0.75]],
+        vec![vec![0.75]],
+        vec![vec![0.75]],
+    );
+
+    run_trainer(board, "random", "random", params, "btn_bb_srp").await;
+    //run_consumer().await?;
+    Ok(())
+}
+
+async fn run_trainer(
+    board: Board,
+    oop_range: &str,
+    ip_range: &str,
+    params: GameParams,
+    bucket_name: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let traversal = build_traversal_from_ranges(board, oop_range, ip_range);
+
+    let mut game = Game::new(traversal, params, board);
+
+    game.train(100);
+    let file_name = format!(
+        "{}{}{}.json",
+        number_to_card(board[0]),
+        number_to_card(board[1]),
+        number_to_card(board[2])
+    );
+    //game.output_results(bucket_name, file_name.as_ref()).await?;
+    Ok(())
+}
+
+async fn run_consumer() -> Result<(), Box<dyn std::error::Error>> {
     let addr = std::env::var("AMQP_ADDR").unwrap_or_else(|_| "amqp://127.0.0.1:5672/%2f".into());
 
     let connection_props = ConnectionProperties::default()
@@ -73,15 +126,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             println!("received msg: {:?}", p);
 
-            let b: Vec<u8> = p.board.split(",").map(|x| card_to_number(x.to_string())).collect();
+            let b: Vec<u8> = p
+                .board
+                .split(",")
+                .map(|x| card_to_number(x.to_string()))
+                .collect();
 
-            let board: Board = [
-                b[0],
-                b[1],
-                b[2],
-                52,
-                52
-            ];
+            let board: Board = [b[0], b[1], b[2], 52, 52];
 
             println!("board: {:?}", board);
 
@@ -95,59 +146,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     p.starting_stack,
                     p.all_in_cut_off,
                     p.default_bet,
-                    vec![vec![]],
-                    vec![vec![0.75]],
-                    vec![vec![0.75]],
-                    vec![vec![0.75]],
-                    vec![vec![0.75]],
-                    vec![vec![0.75]],
+                    p.oop_flop_bets.unwrap_or(vec![vec![]]),
+                    p.oop_turn_bets.unwrap_or(vec![vec![]]),
+                    p.oop_river_bets.unwrap_or(vec![vec![]]),
+                    p.ip_flop_bets.unwrap_or(vec![vec![]]),
+                    p.ip_turn_bets.unwrap_or(vec![vec![]]),
+                    p.ip_river_bets.unwrap_or(vec![vec![]]),
                 ),
-            );
+                p.bucket_name.as_ref(),
+            )
+            .await;
             channel
                 .basic_ack(delivery.delivery_tag, BasicAckOptions::default())
                 .await?
         }
     }
-
     Ok(())
-}
-
-fn run_trainer(board: Board, oop_range: &str, ip_range: &str, params: GameParams) {
-    println!("Params: {:?}", params);
-    println!("range: {} range: {}", oop_range, ip_range);
-    let starting_combinations = construct_starting_range_from_string(oop_range.to_string(), &board);
-    let starting_combinations2 = construct_starting_range_from_string(ip_range.to_string(), &board);
-    let sg = build_initial_suit_groups(&board);
-    let mut iso = false;
-    for suit in 0u8..4 {
-        if sg[usize::from(suit)] != suit {
-            iso = true;
-        }
-    }
-    let rm = if iso {
-        RangeManagers::from(IsomorphicRangeManager::new(starting_combinations, board))
-    } else {
-        RangeManagers::from(DefaultRangeManager::new(starting_combinations, board))
-    };
-
-    let rm2 = if iso {
-        RangeManagers::from(IsomorphicRangeManager::new(starting_combinations2, board))
-    } else {
-        RangeManagers::from(DefaultRangeManager::new(starting_combinations2, board))
-    };
-
-    let trav = Traversal::new(rm, rm2);
-
-    let mut game = Game::new(trav, params, board);
-
-    /*
-    Iteration 0 OOP BR 139.70445 IP BR 146.03627 exploitability = 238.11726 percent of the pot
-    Iteration 25 OOP BR 2.500492 IP BR 7.2116675 exploitability = 8.093467 percent of the pot
-    Iteration 50 OOP BR -1.7358472 IP BR 3.756436 exploitability = 1.6838242 percent of the pot
-
-    real    0m54.853s
-    user    11m19.130s
-    sys     0m5.169s
-     */
-    game.train(75);
 }

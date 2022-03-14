@@ -7,7 +7,7 @@ edition = "2018"
 
 [profile.release]
 lto = "fat"
-codegen-units=1
+codegen-units = 1
 debug = 1
 
 [rust]
@@ -15,11 +15,11 @@ debuginfo-level = 1
 
 
 [dependencies]
-rust_poker =  { version = "0.1.14", features = ["indexer"]}
-rayon = {version = "1.5.1"}
+rust_poker = { version = "0.1.14", features = ["indexer"] }
+rayon = { version = "1.5.1" }
 permutation = "0.2.5"
 enum_dispatch = "0.3.7"
-lapin =  { version = "2.0.1" }
+lapin = { version = "2.0.1" }
 deadpool = "0.9.0"
 deadpool-lapin = "0.10.0"
 tokio = { version = "1.12.0", features = ["macros", "time", "rt-multi-thread"] }
@@ -28,3 +28,5 @@ tokio-executor-trait = "2.1.0"
 tokio-reactor-trait = "1.1.0"
 serde_json = "1.0"
 serde = "1.0.136"
+serde_with = "1.12.0"
+cloud-storage = "0.10"

@@ -1,11 +1,12 @@
+use super::node::CfrNode;
+use crate::nodes::node::NodeResult;
 use crate::{
     cfr::traversal::Traversal,
     nodes::showdown_node::showdown,
     ranges::{combination::Board, utility::check_card_overlap},
 };
 
-use super::node::CfrNode;
-
+#[derive(Debug)]
 pub struct AllInShowdownNode {
     win_utility: f32,
     street: u8,
@@ -22,12 +23,16 @@ impl CfrNode for AllInShowdownNode {
     }
 
     fn best_response(
-        &self,
+        &mut self,
         traversal: &Traversal,
         op_reach_prob: &[f32],
         board: &Board,
     ) -> Vec<f32> {
         self.all_in_showdown_node_utility(traversal, op_reach_prob, board)
+    }
+
+    fn output_results(&self) -> Option<NodeResult> {
+        None
     }
 }
 

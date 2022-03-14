@@ -1,7 +1,4 @@
-use rayon::iter::{
-    IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator,
-};
-
+use crate::nodes::node::{CfrNode, Node, NodeResult, NodeResultType};
 use crate::{
     cfr::traversal::Traversal,
     ranges::{
@@ -12,8 +9,9 @@ use crate::{
         },
     },
 };
-
-use super::node::{CfrNode, Node};
+use rayon::iter::{
+    IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator,
+};
 
 pub struct ChanceNode {
     street: u8,
@@ -102,7 +100,7 @@ impl CfrNode for ChanceNode {
     }
 
     fn best_response(
-        &self,
+        &mut self,
         traversal: &Traversal,
         op_reach_prob: &[f32],
         board: &Board,
@@ -125,7 +123,7 @@ impl CfrNode for ChanceNode {
 
         let sub_results: Vec<Vec<f32>> = if self.parallel {
             self.next_nodes
-                .par_iter()
+                .par_iter_mut()
                 .zip(next_boards.par_iter())
                 .map(|(node, new_board)| {
                     let next_probs = traversal.get_next_reach_probs(new_board, op_reach_prob);
@@ -137,7 +135,7 @@ impl CfrNode for ChanceNode {
                 .collect()
         } else {
             self.next_nodes
-                .iter()
+                .iter_mut()
                 .zip(next_boards.iter())
                 .map(|(node, new_board)| {
                     let next_probs = traversal.get_next_reach_probs(new_board, op_reach_prob);
@@ -177,6 +175,25 @@ impl CfrNode for ChanceNode {
         traversal.merge_canonical_utilities(board, &mut result);
 
         result
+    }
+
+    fn output_results(&self) -> Option<NodeResult> {
+        let next = if self.street == 1 {
+            self.next_nodes
+                .iter()
+                .filter_map(|node| node.output_results())
+                .collect()
+        } else {
+            vec![]
+        };
+
+        Some(NodeResult {
+            node_type: NodeResultType::Chance,
+            node_strategy: None,
+            node_ev: None,
+            next_cards: Option::from(self.next_cards.clone()),
+            next_nodes: next,
+        })
     }
 }
 
