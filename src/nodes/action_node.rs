@@ -1,6 +1,6 @@
-use crate::{cfr::traversal::Traversal, ranges::combination::Board};
-
 use super::node::{CfrNode, Node};
+use crate::nodes::node::{NodeResult, NodeResultType};
+use crate::{cfr::traversal::Traversal, ranges::combination::Board};
 
 pub struct ActionNode {
     pub player_node: u8,
@@ -12,6 +12,7 @@ pub struct ActionNode {
     next_nodes: Vec<Node>,
     regret_accumulator: Vec<f32>,
     strategy_accumulator: Vec<f32>,
+    node_ev: Option<Vec<f32>>,
 }
 
 impl CfrNode for ActionNode {
@@ -31,17 +32,21 @@ impl CfrNode for ActionNode {
     }
 
     fn best_response(
-        &self,
+        &mut self,
         traversal: &Traversal,
         op_reach_prob: &[f32],
         board: &Board,
     ) -> Vec<f32> {
         if self.player_node == traversal.traverser {
             let mut best_ev = vec![0.0; self.num_hands];
+            let mut node_evs = vec![];
             for action in 0..self.num_actions {
                 let next_ev =
                     self.next_nodes[action].best_response(traversal, op_reach_prob, board);
 
+                if traversal.persist_evs {
+                    node_evs.extend_from_slice(&next_ev)
+                }
                 best_ev
                     .iter_mut()
                     .zip(next_ev.iter())
@@ -50,6 +55,33 @@ impl CfrNode for ActionNode {
                             *best = *next;
                         }
                     });
+            }
+            if traversal.persist_evs {
+                let opp_hands = traversal.get_range_for_opponent(board);
+                let mut card_removal = [0.0; 52];
+                let mut probability_sum = 0.0;
+
+                op_reach_prob
+                    .iter()
+                    .zip(opp_hands.iter())
+                    .for_each(|(prob, hand)| {
+                        if *prob > 0.0 {
+                            probability_sum += prob;
+
+                            card_removal[usize::from(hand.hand[0])] += prob;
+                            card_removal[usize::from(hand.hand[1])] += prob;
+                        }
+                    });
+
+                for (i, ev) in node_evs.iter_mut().enumerate() {
+                    *ev /= probability_sum
+                        - card_removal[usize::from(opp_hands[i % opp_hands.len()].hand[0])]
+                        - card_removal[usize::from(opp_hands[i % opp_hands.len()].hand[1])]
+                        + op_reach_prob[i % opp_hands.len()];
+                    *ev += self.pot_size;
+                }
+
+                self.node_ev = Some(node_evs)
             }
             best_ev
         } else {
@@ -81,6 +113,20 @@ impl CfrNode for ActionNode {
             node_ev
         }
     }
+
+    fn output_results(&self) -> Option<NodeResult> {
+        Some(NodeResult {
+            node_type: NodeResultType::Action,
+            node_strategy: Some(self.get_average_strategy()),
+            node_ev: self.node_ev.clone(),
+            next_cards: None,
+            next_nodes: self
+                .next_nodes
+                .iter()
+                .filter_map(|node| node.output_results())
+                .collect(),
+        })
+    }
 }
 
 impl ActionNode {
@@ -101,6 +147,7 @@ impl ActionNode {
             next_nodes: vec![],
             regret_accumulator: vec![],
             strategy_accumulator: vec![],
+            node_ev: None,
         }
     }
 
@@ -237,8 +284,9 @@ impl ActionNode {
 
             if normalizing_value > 0.0 {
                 for action in 0..self.num_actions {
-                    average_strategy[hand + action * self.num_hands] +=
-                        self.strategy_accumulator[hand + action * self.num_hands] / normalizing_value;
+                    average_strategy[hand + action * self.num_hands] += self.strategy_accumulator
+                        [hand + action * self.num_hands]
+                        / normalizing_value;
                 }
             } else {
                 let probability = 1.0 / (self.num_actions as f32);
@@ -379,41 +427,41 @@ mod tests {
 
     use super::ActionNode;
 
-    #[test]
-    fn test_cfr() {
-        let mut action = ActionNode::new(1, 18, 10.0, 15.0, 10.0);
-        let terminal_node = Node::from(TerminalNode::new(10.0, 0));
-        let showdown_node = Node::from(ShowdownNode::new(20.0));
+    // #[test]
+    // fn test_cfr() {
+    //     let mut action = ActionNode::new(1, 18, 10.0, 15.0, 10.0);
+    //     let terminal_node = Node::from(TerminalNode::new(10.0, 0));
+    //     let showdown_node = Node::from(ShowdownNode::new(20.0));
 
-        action.add_child(terminal_node);
-        action.add_child(showdown_node);
-        action.init_vectors();
+    //     action.add_child(terminal_node);
+    //     action.add_child(showdown_node);
+    //     action.init_vectors();
 
-        let board = [51, 26, 20, 15, 11];
+    //     let board = [51, 26, 20, 15, 11];
 
-        let op_reach_prob = vec![1.0; 18];
+    //     let op_reach_prob = vec![1.0; 18];
 
-        let traverser_hands = construct_starting_range_from_string("QQ,33,22".to_string(), &board);
-        let opp_hands = construct_starting_range_from_string("QQ,33,22".to_string(), &board);
+    //     let traverser_hands = construct_starting_range_from_string("QQ,33,22".to_string(), &board);
+    //     let opp_hands = construct_starting_range_from_string("QQ,33,22".to_string(), &board);
 
-        let opp_rm = RangeManager::new(opp_hands, board);
-        let ip_rm = RangeManager::new(traverser_hands, board);
+    //     let opp_rm = RangeManager::new(opp_hands, board);
+    //     let ip_rm = RangeManager::new(traverser_hands, board);
 
-        let mut trav = Traversal::new(opp_rm, ip_rm);
-        trav.traverser = 1;
+    //     let mut trav = Traversal::new(opp_rm, ip_rm);
+    //     trav.traverser = 1;
 
-        let result = action.cfr_traversal(&trav, &op_reach_prob, &board);
+    //     let result = action.cfr_traversal(&trav, &op_reach_prob, &board);
 
-        for i in 0..6 {
-            assert_eq!(result[i], -92.5);
-        }
+    //     for i in 0..6 {
+    //         assert_eq!(result[i], -92.5);
+    //     }
 
-        for i in 6..12 {
-            assert_eq!(result[i], -32.5);
-        }
+    //     for i in 6..12 {
+    //         assert_eq!(result[i], -32.5);
+    //     }
 
-        for i in 12..18 {
-            assert_eq!(result[i], 27.5);
-        }
-    }
+    //     for i in 12..18 {
+    //         assert_eq!(result[i], 27.5);
+    //     }
+    // }
 }

@@ -1,8 +1,10 @@
+use super::{game_params::GameParams, traversal::Traversal};
 use crate::nodes::all_in_showdown_node::AllInShowdownNode;
 use crate::nodes::chance_node::ChanceNode;
-use crate::nodes::node::CfrNode;
-
-use crate::ranges::utility::range_relative_probabilities;
+use crate::nodes::node::{CfrNode, NodeResult};
+use crate::ranges::combination::Combination;
+use crate::ranges::range_manager::RangeManager;
+use crate::ranges::utility::{hand_to_string, range_relative_probabilities};
 use crate::{
     nodes::{
         action_node::ActionNode, node::Node, showdown_node::ShowdownNode,
@@ -10,12 +12,26 @@ use crate::{
     },
     ranges::{combination::Board, utility::unblocked_hands},
 };
+use cloud_storage::Client;
+use std::fs::File;
+use std::io::Write;
 
-use super::{game_params::GameParams, traversal::Traversal};
+use serde::{Deserialize, Serialize};
+
+#[serde_with::skip_serializing_none]
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GameResult {
+    pub oop_range: Vec<Combination>,
+    pub ip_range: Vec<Combination>,
+    pub game_params: GameParams,
+    pub starting_board: Board,
+    pub node_results: NodeResult,
+}
 
 pub struct Game {
     traversal: Traversal,
-    root: Node,
+    pub root: Node,
     game_params: GameParams,
     starting_board: Board,
 }
@@ -40,15 +56,15 @@ impl Game {
             .traversal
             .get_range_for_active_player(&self.starting_board);
 
-        let ip = vec![1.0; ip_range.len()];
-        let oop = vec![1.0; oop_range.len()];
+        let ip: Vec<f32> = ip_range.iter().map(|combo| combo.combos).collect();
+        let oop: Vec<f32> = oop_range.iter().map(|combo| combo.combos).collect();
 
         let ip_relative_probs = range_relative_probabilities(ip_range, oop_range);
         let oop_relative_probs = range_relative_probabilities(oop_range, ip_range);
 
-        let oop_br = self.overall_best_response(&oop_relative_probs, &ip, &self.starting_board);
+        let oop_br = self.overall_best_response(&oop_relative_probs, &ip);
         self.traversal.traverser = 1;
-        let ip_br = self.overall_best_response(&ip_relative_probs, &oop, &self.starting_board);
+        let ip_br = self.overall_best_response(&ip_relative_probs, &oop);
         let exploitability = (ip_br + oop_br) / 2.0 / self.game_params.starting_pot * 100.0;
         println!(
             "Iteration 0 OOP BR {} IP BR {} exploitability = {} percent of the pot",
@@ -65,11 +81,9 @@ impl Game {
                 .cfr_traversal(&self.traversal, &ip, &self.starting_board);
             if i > 0 && i % 25 == 0 {
                 self.traversal.traverser = 0;
-                let oop_br =
-                    self.overall_best_response(&oop_relative_probs, &ip, &self.starting_board);
+                let oop_br = self.overall_best_response(&oop_relative_probs, &ip);
                 self.traversal.traverser = 1;
-                let ip_br =
-                    self.overall_best_response(&ip_relative_probs, &oop, &self.starting_board);
+                let ip_br = self.overall_best_response(&ip_relative_probs, &oop);
                 let exploitability = (ip_br + oop_br) / 2.0 / self.game_params.starting_pot * 100.0;
                 println!(
                     "Iteration {} OOP BR {} IP BR {} exploitability = {} percent of the pot",
@@ -77,22 +91,29 @@ impl Game {
                 );
             }
         }
+
+        self.traversal.persist_evs = true;
+        self.traversal.traverser = 0;
+        self.overall_best_response(&oop_relative_probs, &ip);
+        self.traversal.traverser = 1;
+        self.overall_best_response(&ip_relative_probs, &oop);
     }
 
     fn overall_best_response(
-        &self,
+        &mut self,
         responder_relative_probs: &[f32],
         opp_reach_probs: &[f32],
-        board: &Board,
     ) -> f32 {
-        let responder_hands = self.traversal.get_range_for_active_player(board);
-        let opponent_hands = self.traversal.get_range_for_opponent(board);
+        let responder_hands = self
+            .traversal
+            .get_range_for_active_player(&self.starting_board);
+        let opponent_hands = self.traversal.get_range_for_opponent(&self.starting_board);
 
         let unblocked = unblocked_hands(responder_hands, opponent_hands);
 
-        let evs = self
-            .root
-            .best_response(&self.traversal, opp_reach_probs, board);
+        let evs: Vec<f32> =
+            self.root
+                .best_response(&self.traversal, opp_reach_probs, &self.starting_board);
 
         let mut sum = 0.0;
 
@@ -224,7 +245,11 @@ impl Game {
         let current_bets = if root.pot_size * self.game_params.all_in_cut_off
             >= root.ip_stack.max(root.oop_stack)
         {
-            vec![self.game_params.all_in_cut_off; 1]
+            let mut v = self
+                .get_current_bets(street, root.player_node, bet_number)
+                .to_vec();
+            v.push(self.game_params.all_in_cut_off);
+            v
         } else {
             self.get_current_bets(street, root.player_node, bet_number)
                 .to_vec()
@@ -290,5 +315,29 @@ impl Game {
             }
         }
         &self.game_params.default_bets[0]
+    }
+
+    pub async fn output_results(
+        &self,
+        bucket_name: &str,
+        file_name: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        println!("Uploading file {} to bucket {}", file_name, bucket_name);
+        let result = GameResult {
+            oop_range: self.traversal.oop_rm.get_starting_combinations(),
+            ip_range: self.traversal.ip_rm.get_starting_combinations(),
+            game_params: self.game_params.clone(),
+            starting_board: self.starting_board.clone(),
+            node_results: self.root.output_results().unwrap(),
+        };
+
+        let bytes = serde_json::to_string(&result).unwrap().as_bytes().to_vec();
+
+        let client = Client::default();
+        client
+            .object()
+            .create(bucket_name, bytes, &file_name, "application/json")
+            .await?;
+        Ok(())
     }
 }
