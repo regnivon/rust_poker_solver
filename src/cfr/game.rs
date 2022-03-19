@@ -4,7 +4,7 @@ use crate::nodes::chance_node::ChanceNode;
 use crate::nodes::node::{CfrNode, NodeResult};
 use crate::ranges::combination::Combination;
 use crate::ranges::range_manager::RangeManager;
-use crate::ranges::utility::{hand_to_string, range_relative_probabilities};
+use crate::ranges::utility::{range_relative_probabilities};
 use crate::{
     nodes::{
         action_node::ActionNode, node::Node, showdown_node::ShowdownNode,
@@ -13,8 +13,6 @@ use crate::{
     ranges::{combination::Board, utility::unblocked_hands},
 };
 use cloud_storage::Client;
-use std::fs::File;
-use std::io::Write;
 
 use serde::{Deserialize, Serialize};
 
@@ -78,7 +76,7 @@ impl Game {
                 .cfr_traversal(&self.traversal, &ip, &self.starting_board);
             self.traversal.traverser = 1;
             self.root
-                .cfr_traversal(&self.traversal, &ip, &self.starting_board);
+                .cfr_traversal(&self.traversal, &oop, &self.starting_board);
             if i > 0 && i % 25 == 0 {
                 self.traversal.traverser = 0;
                 let oop_br = self.overall_best_response(&oop_relative_probs, &ip);
@@ -116,7 +114,9 @@ impl Game {
                 .best_response(&self.traversal, opp_reach_probs, &self.starting_board);
 
         let mut sum = 0.0;
-
+        //
+        // let q: f32 = evs.iter().sum();
+        // println!("{}", q);
         for i in 0..evs.len() {
             sum += evs[i] * responder_relative_probs[i] / unblocked[i];
         }

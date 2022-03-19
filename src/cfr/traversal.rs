@@ -6,10 +6,12 @@ use crate::{
     build_initial_suit_groups, construct_starting_range_from_string, DefaultRangeManager,
     IsomorphicRangeManager,
 };
+use crate::ranges::utility::{build_player_specific_merged_range, hand_to_string};
 
 pub fn build_traversal_from_ranges(board: Board, oop_range: &str, ip_range: &str) -> Traversal {
-    let oop_combinations = construct_starting_range_from_string(oop_range.to_string(), &board);
-    let ip_combinations = construct_starting_range_from_string(ip_range.to_string(), &board);
+    let merged = construct_starting_range_from_string(format!("{},{}", oop_range, ip_range), &board);
+    let oop_combinations = build_player_specific_merged_range(oop_range.to_string(), &merged);
+    let ip_combinations = build_player_specific_merged_range(ip_range.to_string(), &merged);
 
     let sg = build_initial_suit_groups(&board);
     let mut iso = false;

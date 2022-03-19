@@ -90,13 +90,38 @@ pub fn construct_starting_range_from_string(
     let starting_range = HandRange::from_strings([range_string].to_vec());
     let mut starting_combinations = vec![];
     for hand in starting_range[0].hands.iter() {
-        let combo = Combination::new([hand.0, hand.1], 0, f32::from(hand.2) / 100.0);
+        let combo = Combination::new([hand.0, hand.1], 0, 0.0);
         if !check_hand_overlap(combo.hand, board) {
             starting_combinations.push(combo)
         }
     }
 
     starting_combinations
+}
+
+// currently invariant is held that ip_hands[i] == oop_hands[i], need to test if this is faster than
+// fewer hands w/ maintaining reference into opponent hands for where equivalent hand is (bad locality?)
+pub fn build_player_specific_merged_range(
+    range_string: String,
+    merged_range: &Vec<Combination>,
+) -> Vec<Combination> {
+    let starting_range = HandRange::from_strings([range_string].to_vec());
+    let mut starting_combinations = vec![];
+    let mut final_range = vec![];
+    for hand in starting_range[0].hands.iter() {
+        let combo = Combination::new([hand.0, hand.1], 0, f32::from(hand.2) / 100.0);
+        starting_combinations.push(combo)
+    }
+
+    for &hand in merged_range.iter() {
+        let to_add = match starting_combinations.iter().find(|&h| hand.eq(h)) {
+            None => hand,
+            Some(&matching_hand) => matching_hand
+        };
+        final_range.push(to_add)
+    }
+
+    final_range
 }
 
 pub fn range_relative_probabilities(rng: &Range, opp_range: &Range) -> Vec<f32> {

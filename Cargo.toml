@@ -20,8 +20,6 @@ rayon = { version = "1.5.1" }
 permutation = "0.2.5"
 enum_dispatch = "0.3.7"
 lapin = { version = "2.0.1" }
-deadpool = "0.9.0"
-deadpool-lapin = "0.10.0"
 tokio = { version = "1.12.0", features = ["macros", "time", "rt-multi-thread"] }
 futures-lite = "1.12.0"
 tokio-executor-trait = "2.1.0"
