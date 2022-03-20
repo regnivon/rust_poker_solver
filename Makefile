@@ -1,5 +1,5 @@
 docker:
-	docker build . -t gcr.io/poker-sims/solver
+	docker build . --tag gcr.io/poker-sims/solver:0.0.3
 
 push: docker
-	docker push gcr.io/poker-sims/solver
+	docker push gcr.io/poker-sims/solver:0.0.3

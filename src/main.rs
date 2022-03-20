@@ -27,7 +27,8 @@ use std::str;
 struct SolutionConfig {
     pub bucket_name: String,
     pub board: String,
-    pub range: String,
+    pub oop_range: String,
+    pub ip_range: String,
     pub starting_pot: f32,
     pub starting_stack: f32,
     pub all_in_cut_off: f32,
@@ -98,7 +99,7 @@ async fn run_trainer(
 
 async fn run_consumer() -> Result<(), Box<dyn std::error::Error>> {
     let addr = std::env::var("AMQP_ADDR").unwrap_or_else(|_| "amqp://127.0.0.1:5672/%2f".into());
-
+    println!("{}", addr);
     let connection_props = ConnectionProperties::default()
         .with_executor(tokio_executor_trait::Tokio::current())
         .with_reactor(tokio_reactor_trait::Tokio);
@@ -142,8 +143,8 @@ async fn run_consumer() -> Result<(), Box<dyn std::error::Error>> {
 
             run_trainer(
                 board,
-                &p.range,
-                &p.range,
+                &p.oop_range,
+                &p.ip_range,
                 GameParams::new(
                     1,
                     p.starting_pot,

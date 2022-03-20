@@ -1,6 +1,8 @@
-FROM rustlang/rust:nightly-buster-slim as builder
+FROM rustlang/rust:nightly as builder
 
 WORKDIR /usr
+
+RUN apt-get update -y && apt-get install -y pkg-config openssl cmake clang
 
 RUN USER=root cargo new --bin poker-solver
 
