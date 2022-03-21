@@ -47,7 +47,7 @@ async fn build_and_run_consumer() -> Result<(), Box<dyn std::error::Error>> {
         .with_reactor(tokio_reactor_trait::Tokio);
     let conn = Connection::connect(&addr, connection_props).await?;
     let channel = conn.create_channel().await?;
-    channel.basic_qos(1, BasicQosOptions::default());
+    channel.basic_qos(1, BasicQosOptions::default()).await?;
 
     let mut consumer = channel
         .basic_consume(
