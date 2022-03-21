@@ -81,17 +81,23 @@ impl Game {
         let ip_relative_probs = range_relative_probabilities(ip_range, oop_range);
         let oop_relative_probs = range_relative_probabilities(oop_range, ip_range);
 
-        let oop_br = self.overall_best_response(&oop_relative_probs, &ip);
-        self.traversal.traverser = 1;
-        let ip_br = self.overall_best_response(&ip_relative_probs, &oop);
-        let mut exploitability = (ip_br + oop_br) / 2.0 / self.game_params.starting_pot * 100.0;
-        info!(
-            "Iteration 0 OOP BR {} IP BR {} exploitability = {} percent of the pot",
-            oop_br, ip_br, exploitability
-        );
-
         let mut iterations = 0;
-        while exploitability > target_nash_distance {
+        loop {
+            if iterations % 15 == 0 {
+                self.traversal.traverser = 0;
+                let oop_br = self.overall_best_response(&oop_relative_probs, &ip);
+                self.traversal.traverser = 1;
+                let ip_br = self.overall_best_response(&ip_relative_probs, &oop);
+                let exploitability = (ip_br + oop_br) / 2.0 / self.game_params.starting_pot * 100.0;
+                info!(
+                    "Iteration {} OOP BR {} IP BR {} exploitability = {} percent of the pot",
+                    iterations, oop_br, ip_br, exploitability
+                );
+                if exploitability < target_nash_distance {
+                    break;
+                }
+            }
+
             self.traversal.iteration = iterations;
             self.traversal.traverser = 0;
             self.root
@@ -99,17 +105,6 @@ impl Game {
             self.traversal.traverser = 1;
             self.root
                 .cfr_traversal(&self.traversal, &oop, &self.starting_board);
-            if iterations > 0 && iterations % 25 == 0 {
-                self.traversal.traverser = 0;
-                let oop_br = self.overall_best_response(&oop_relative_probs, &ip);
-                self.traversal.traverser = 1;
-                let ip_br = self.overall_best_response(&ip_relative_probs, &oop);
-                exploitability = (ip_br + oop_br) / 2.0 / self.game_params.starting_pot * 100.0;
-                info!(
-                    "Iteration {} OOP BR {} IP BR {} exploitability = {} percent of the pot",
-                    iterations, oop_br, ip_br, exploitability
-                );
-            }
             iterations += 1;
         }
 
