@@ -8,7 +8,6 @@ WORKDIR /usr/poker-solver
 
 ADD . ./
 
-RUN rm ./target/release/deps/poker_solver*
 RUN cargo +nightly build --release
 
 CMD [ "./target/release/poker-solver" ]
