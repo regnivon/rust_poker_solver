@@ -51,6 +51,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     //     Ok(_) => {}
     //     Err(e) => info!("Error during execution {}", e)
     // }
-    run_consumer().await?;
+    run_consumer().await;
     Ok(())
 }
