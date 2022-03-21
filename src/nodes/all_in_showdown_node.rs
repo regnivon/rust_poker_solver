@@ -120,7 +120,7 @@ impl AllInShowdownNode {
                 });
         }
 
-        traversal.merge_canonical_utilities(&board, &mut utility);
+        traversal.merge_canonical_utilities(board, &mut utility);
 
         utility
     }

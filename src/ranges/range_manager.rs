@@ -112,11 +112,11 @@ impl IsomorphicRangeManager {
             let hand_index = self.flop_indexer.get_index(&flop_board_hand);
             if !canon_index_to_range_index.contains_key(&hand_index) {
                 canon_index_to_range_index.insert(hand_index, index_count);
-                flop_hands.push(hand.clone());
+                flop_hands.push(*hand);
             } else {
                 let canon_location = canon_index_to_range_index[&hand_index];
                 flop_hands[canon_location].weight += 1;
-                let mut combo = hand.clone();
+                let mut combo = *hand;
                 combo.canon_index = flop_hands[canon_location].raw_index;
                 combo.weight = 0;
                 flop_hands.push(combo);
@@ -406,7 +406,7 @@ impl RangeManager for IsomorphicRangeManager {
         let board_key = get_key(new_board);
         let next_hands = &self.ranges[&board_key];
 
-        let mut last_board = new_board.clone();
+        let mut last_board = *new_board;
         if last_board[4] == 52 {
             last_board[3] = 52;
         } else {
@@ -427,7 +427,7 @@ impl RangeManager for IsomorphicRangeManager {
         let board_key = get_key(new_board);
         let next_hands = &self.ranges[&board_key];
 
-        let mut last_board = new_board.clone();
+        let mut last_board = *new_board;
         if last_board[4] == 52 {
             last_board[3] = 52;
         } else {
@@ -454,7 +454,7 @@ impl RangeManager for IsomorphicRangeManager {
     }
 
     fn get_reach_probs_mapping(&self, board: &Board) -> &Vec<usize> {
-        return &self.reach_probs_mapping[&get_key(board)];
+        &self.reach_probs_mapping[&get_key(board)]
     }
 
     fn get_starting_combinations(&self) -> Vec<Combination> {
@@ -734,7 +734,7 @@ impl RangeManager for DefaultRangeManager {
     }
 
     fn get_reach_probs_mapping(&self, board: &Board) -> &Vec<usize> {
-        return &self.reach_probs_mapping[&get_key(board)];
+        &self.reach_probs_mapping[&get_key(board)]
     }
 
     fn get_starting_combinations(&self) -> Vec<Combination> {

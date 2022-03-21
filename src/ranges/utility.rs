@@ -29,7 +29,7 @@ pub fn build_initial_suit_groups(board: &Board) -> Vec<u8> {
     suit_groups
 }
 
-pub fn build_next_suit_groups(board: &Board, prior_groups: &Vec<u8>) -> Vec<u8> {
+pub fn build_next_suit_groups(board: &Board, prior_groups: &[u8]) -> Vec<u8> {
     let mut ranks_used = vec![0u16; 4];
     let mut suit_groups = vec![0; 4];
 
@@ -103,7 +103,7 @@ pub fn construct_starting_range_from_string(
 // fewer hands w/ maintaining reference into opponent hands for where equivalent hand is (bad locality?)
 pub fn build_player_specific_merged_range(
     range_string: String,
-    merged_range: &Vec<Combination>,
+    merged_range: &[Combination],
 ) -> Vec<Combination> {
     let starting_range = HandRange::from_strings([range_string].to_vec());
     let mut starting_combinations = vec![];

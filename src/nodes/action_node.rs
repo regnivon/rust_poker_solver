@@ -309,10 +309,10 @@ impl ActionNode {
         let positive_multiplier = alpha / (alpha + 1.0);
         let negative_multiplier = 0.5;
 
-        for action in 0..self.num_actions {
+        for (action, action_util) in action_utility.iter().enumerate() {
             self.regret_accumulator[action * self.num_hands..(action + 1) * self.num_hands]
                 .iter_mut()
-                .zip(action_utility[action].iter())
+                .zip(action_util.iter())
                 .zip(node_utility.iter())
                 .for_each(|((regret, action_util), node_util)| {
                     *regret += action_util - node_util;
@@ -352,7 +352,7 @@ impl ActionNode {
         &mut self,
         traversal: &Traversal,
         op_reach_prob: &[f32],
-        node_utility: &mut Vec<f32>,
+        node_utility: &mut [f32],
         board: &Board,
     ) {
         let mut action_utility = vec![vec![0.0; 0]; self.num_actions];
@@ -381,7 +381,7 @@ impl ActionNode {
         &mut self,
         traversal: &Traversal,
         op_reach_prob: &[f32],
-        node_utility: &mut Vec<f32>,
+        node_utility: &mut [f32],
         board: &Board,
     ) {
         let strategies = self.get_strategy();

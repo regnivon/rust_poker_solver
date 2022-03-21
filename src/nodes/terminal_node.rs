@@ -2,9 +2,7 @@ use crate::{
     cfr::traversal::Traversal,
     ranges::combination::{Board, Combination},
 };
-
 use crate::nodes::node::{CfrNode, NodeResult};
-use crate::ranges::utility::hand_to_string;
 
 #[derive(Debug)]
 pub struct TerminalNode {

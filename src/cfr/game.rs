@@ -4,17 +4,38 @@ use crate::nodes::chance_node::ChanceNode;
 use crate::nodes::node::{CfrNode, NodeResult};
 use crate::ranges::combination::Combination;
 use crate::ranges::range_manager::RangeManager;
-use crate::ranges::utility::{range_relative_probabilities};
-use crate::{
-    nodes::{
-        action_node::ActionNode, node::Node, showdown_node::ShowdownNode,
-        terminal_node::TerminalNode,
-    },
-    ranges::{combination::Board, utility::unblocked_hands},
-};
+use crate::ranges::utility::{number_to_card, range_relative_probabilities};
+use crate::{nodes::{
+    action_node::ActionNode, node::Node, showdown_node::ShowdownNode,
+    terminal_node::TerminalNode,
+}, ranges::{combination::Board, utility::unblocked_hands}};
 use cloud_storage::Client;
 
 use serde::{Deserialize, Serialize};
+use tracing::info;
+use crate::cfr::traversal::build_traversal_from_ranges;
+
+pub async fn run_trainer(
+    board: Board,
+    oop_range: &str,
+    ip_range: &str,
+    params: GameParams,
+    bucket_name: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let traversal = build_traversal_from_ranges(board, oop_range, ip_range);
+
+    let mut game = Game::new(traversal, params, board);
+
+    game.train(0.5);
+    let file_name = format!(
+        "{}{}{}.json",
+        number_to_card(board[0]),
+        number_to_card(board[1]),
+        number_to_card(board[2])
+    );
+    game.output_results(bucket_name, file_name.as_ref()).await?;
+    Ok(())
+}
 
 #[serde_with::skip_serializing_none]
 #[derive(Serialize, Deserialize, Debug)]
@@ -44,7 +65,7 @@ impl Game {
         }
     }
 
-    pub fn train(&mut self, iterations: u32) {
+    pub fn train(&mut self, target_nash_distance: f32) {
         self.construct_tree();
 
         self.traversal.traverser = 0;
@@ -63,31 +84,33 @@ impl Game {
         let oop_br = self.overall_best_response(&oop_relative_probs, &ip);
         self.traversal.traverser = 1;
         let ip_br = self.overall_best_response(&ip_relative_probs, &oop);
-        let exploitability = (ip_br + oop_br) / 2.0 / self.game_params.starting_pot * 100.0;
-        println!(
+        let mut exploitability = (ip_br + oop_br) / 2.0 / self.game_params.starting_pot * 100.0;
+        info!(
             "Iteration 0 OOP BR {} IP BR {} exploitability = {} percent of the pot",
             oop_br, ip_br, exploitability
         );
 
-        for i in 0..=iterations {
-            self.traversal.iteration = i;
+        let mut iterations = 0;
+        while exploitability > target_nash_distance {
+            self.traversal.iteration = iterations;
             self.traversal.traverser = 0;
             self.root
                 .cfr_traversal(&self.traversal, &ip, &self.starting_board);
             self.traversal.traverser = 1;
             self.root
                 .cfr_traversal(&self.traversal, &oop, &self.starting_board);
-            if i > 0 && i % 25 == 0 {
+            if iterations > 0 && iterations % 25 == 0 {
                 self.traversal.traverser = 0;
                 let oop_br = self.overall_best_response(&oop_relative_probs, &ip);
                 self.traversal.traverser = 1;
                 let ip_br = self.overall_best_response(&ip_relative_probs, &oop);
-                let exploitability = (ip_br + oop_br) / 2.0 / self.game_params.starting_pot * 100.0;
-                println!(
+                exploitability = (ip_br + oop_br) / 2.0 / self.game_params.starting_pot * 100.0;
+                info!(
                     "Iteration {} OOP BR {} IP BR {} exploitability = {} percent of the pot",
-                    i, oop_br, ip_br, exploitability
+                    iterations, oop_br, ip_br, exploitability
                 );
             }
+            iterations += 1;
         }
 
         self.traversal.persist_evs = true;
@@ -116,7 +139,7 @@ impl Game {
         let mut sum = 0.0;
         //
         // let q: f32 = evs.iter().sum();
-        // println!("{}", q);
+        // info!("{}", q);
         for i in 0..evs.len() {
             sum += evs[i] * responder_relative_probs[i] / unblocked[i];
         }
@@ -322,12 +345,12 @@ impl Game {
         bucket_name: &str,
         file_name: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Uploading file {} to bucket {}", file_name, bucket_name);
+        info!("Uploading file {} to bucket {}", file_name, bucket_name);
         let result = GameResult {
             oop_range: self.traversal.oop_rm.get_starting_combinations(),
             ip_range: self.traversal.ip_rm.get_starting_combinations(),
             game_params: self.game_params.clone(),
-            starting_board: self.starting_board.clone(),
+            starting_board: self.starting_board,
             node_results: self.root.output_results().unwrap(),
         };
 
@@ -336,7 +359,7 @@ impl Game {
         let client = Client::default();
         client
             .object()
-            .create(bucket_name, bytes, &file_name, "application/json")
+            .create(bucket_name, bytes, file_name, "application/json")
             .await?;
         Ok(())
     }

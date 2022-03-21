@@ -1,12 +1,8 @@
 use crate::ranges::{
     combination::{Board, Combination},
-    range_manager::{RangeManager, RangeManagers},
+    range_manager::{RangeManager, RangeManagers, DefaultRangeManager, IsomorphicRangeManager},
+    utility::{build_initial_suit_groups, build_player_specific_merged_range, construct_starting_range_from_string},
 };
-use crate::{
-    build_initial_suit_groups, construct_starting_range_from_string, DefaultRangeManager,
-    IsomorphicRangeManager,
-};
-use crate::ranges::utility::{build_player_specific_merged_range, hand_to_string};
 
 pub fn build_traversal_from_ranges(board: Board, oop_range: &str, ip_range: &str) -> Traversal {
     let merged = construct_starting_range_from_string(format!("{},{}", oop_range, ip_range), &board);
