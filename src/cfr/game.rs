@@ -108,11 +108,13 @@ impl Game {
             iterations += 1;
         }
 
+        info!("Reached target exploitability, persisting node EVs");
         self.traversal.persist_evs = true;
         self.traversal.traverser = 0;
         self.overall_best_response(&oop_relative_probs, &ip);
         self.traversal.traverser = 1;
         self.overall_best_response(&ip_relative_probs, &oop);
+        info!("Done persisting node EVs");
     }
 
     fn overall_best_response(

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::str;
 use lapin::message::Delivery;
 use tracing::{error, info};
+use std::{thread, time::Duration};
 use crate::{Board, card_to_number, GameParams};
 use crate::cfr::game::run_trainer;
 
@@ -13,6 +14,7 @@ pub async fn run_consumer() {
             Ok(_) => {}
             Err(e) => {
                 error!("Error while running consumer, retrying {}", e);
+                thread::sleep(Duration::from_millis(5000));
             }
         }
     }
