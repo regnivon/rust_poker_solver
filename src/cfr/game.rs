@@ -33,7 +33,7 @@ pub async fn run_trainer(
         number_to_card(board[1]),
         number_to_card(board[2])
     );
-    game.output_results(bucket_name, file_name.as_ref()).await?;
+    // game.output_results(bucket_name, file_name.as_ref()).await?;
     Ok(())
 }
 

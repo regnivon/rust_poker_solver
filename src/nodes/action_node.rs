@@ -165,8 +165,6 @@ impl ActionNode {
         let nums = self.num_actions * self.num_hands;
         let mut strategy = vec![0.0; nums];
 
-        let probability = 1.0 / (self.num_actions as f32);
-
         match self.num_actions {
             2 => {
                 let regret_sum0 = &self.regret_accumulator[0..self.num_hands];
@@ -204,45 +202,53 @@ impl ActionNode {
                 let (strategy0, strategy12) = strategy.split_at_mut(self.num_hands);
                 let (strategy1, strategy2) = strategy12.split_at_mut(self.num_hands);
 
-                for hand in 0..self.num_hands {
-                    if regret_sum0[hand] > 0.0 {
-                        if regret_sum1[hand] > 0.0 {
-                            if regret_sum2[hand] > 0.0 {
-                                let positive_regret_sum =
-                                    regret_sum0[hand] + regret_sum1[hand] + regret_sum2[hand];
-                                strategy0[hand] = regret_sum0[hand] / positive_regret_sum;
-                                strategy1[hand] = regret_sum1[hand] / positive_regret_sum;
-                                strategy2[hand] = regret_sum2[hand] / positive_regret_sum;
+
+                strategy0
+                    .iter_mut()
+                    .zip(strategy1.iter_mut())
+                    .zip(strategy2.iter_mut())
+                    .zip(regret_sum0.iter())
+                    .zip(regret_sum1.iter())
+                    .zip(regret_sum2.iter())
+                    .for_each(|(((((s0, s1), s2), r0 ), r1), r2)| {
+                        if *r0 > 0.0 {
+                            if *r1 > 0.0 {
+                                if *r2 > 0.0 {
+                                    let positive_regret_sum = r0 + r1 + r2;
+                                    *s0 = r0 / positive_regret_sum;
+                                    *s1 = r1 / positive_regret_sum;
+                                    *s2 = r2 / positive_regret_sum;
+                                } else {
+                                    let positive_regret_sum = r0 + r1;
+                                    *s0 = r0 / positive_regret_sum;
+                                    *s1 = r1 / positive_regret_sum;
+                                }
+                            } else if *r2 > 0.0 {
+                                let positive_regret_sum = r0 + r2;
+                                *s0 = r0 / positive_regret_sum;
+                                *s2 = r2 / positive_regret_sum;
                             } else {
-                                let positive_regret_sum = regret_sum0[hand] + regret_sum1[hand];
-                                strategy0[hand] = regret_sum0[hand] / positive_regret_sum;
-                                strategy1[hand] = regret_sum1[hand] / positive_regret_sum;
+                                *s0 = 1.0;
                             }
-                        } else if regret_sum2[hand] > 0.0 {
-                            let positive_regret_sum = regret_sum0[hand] + regret_sum2[hand];
-                            strategy0[hand] = regret_sum0[hand] / positive_regret_sum;
-                            strategy2[hand] = regret_sum2[hand] / positive_regret_sum;
+                        } else if *r1 > 0.0 {
+                            if *r2 > 0.0 {
+                                let positive_regret_sum = r1 + r2;
+                                *s1 = r1 / positive_regret_sum;
+                                *s2 = r2 / positive_regret_sum;
+                            } else {
+                                *s1 = 1.0;
+                            }
+                        } else if *r2 > 0.0 {
+                            *s2 = 1.0;
                         } else {
-                            strategy0[hand] = 1.0;
+                            *s0 = 1.0 / 3.0;
+                            *s1 = 1.0 / 3.0;
+                            *s2 = 1.0 / 3.0;
                         }
-                    } else if regret_sum1[hand] > 0.0 {
-                        if regret_sum2[hand] > 0.0 {
-                            let positive_regret_sum = regret_sum1[hand] + regret_sum2[hand];
-                            strategy1[hand] = regret_sum1[hand] / positive_regret_sum;
-                            strategy2[hand] = regret_sum2[hand] / positive_regret_sum;
-                        } else {
-                            strategy1[hand] = 1.0;
-                        }
-                    } else if regret_sum2[hand] > 0.0 {
-                        strategy2[hand] = 1.0;
-                    } else {
-                        strategy0[hand] = 1.0 / 3.0;
-                        strategy1[hand] = 1.0 / 3.0;
-                        strategy2[hand] = 1.0 / 3.0;
-                    }
-                }
+                    });
             }
             _ => {
+                let probability = 1.0 / (self.num_actions as f32);
                 for hand in 0..self.num_hands {
                     let mut normalizing_value = 0.0;
                     for action in 0..self.num_actions {
