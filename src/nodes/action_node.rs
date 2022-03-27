@@ -210,7 +210,7 @@ impl ActionNode {
                     .zip(regret_sum0.iter())
                     .zip(regret_sum1.iter())
                     .zip(regret_sum2.iter())
-                    .for_each(|(((((s0, s1), s2), r0 ), r1), r2)| {
+                    .for_each(|(((((s0, s1), s2), r0), r1), r2)| {
                         if *r0 > 0.0 {
                             if *r1 > 0.0 {
                                 if *r2 > 0.0 {
@@ -311,7 +311,7 @@ impl ActionNode {
         action_utility: Vec<Vec<f32>>,
         node_utility: &[f32],
     ) {
-        let alpha = f64::from(traversal.iteration).powf(1.5);
+        let alpha = f64::from(traversal.iteration).powf(1.45);
         let positive_multiplier = alpha / (alpha + 1.0);
         let negative_multiplier = 0.5;
 
@@ -338,19 +338,76 @@ impl ActionNode {
         strategies: &[f32],
     ) {
         let strategy_multiplier =
-            (f64::from(traversal.iteration) / f64::from(traversal.iteration + 1)).powi(2);
+            (f64::from(traversal.iteration) / f64::from(traversal.iteration + 1)).powi(2) as f32;
+        let round_multiplier = 0.98;
 
-        for action in 0..self.num_actions {
-            let strategy_slice = &strategies[action * self.num_hands..];
-            self.strategy_accumulator[action * self.num_hands..(action + 1) * self.num_hands]
-                .iter_mut()
-                .zip(op_reach_prob.iter())
-                .zip(strategy_slice.iter())
-                .for_each(|((strategy_sum, prob), strategy)| {
-                    *strategy_sum *= 0.9;
-                    *strategy_sum += prob * strategy;
-                    *strategy_sum *= strategy_multiplier as f32;
-                });
+        match self.num_actions {
+            2 => {
+                let strategy0 = &strategies[0..self.num_hands];
+                let strategy1 = &strategies[self.num_hands..];
+
+                let (strategy_sum0, strategy_sum1) = self.strategy_accumulator.split_at_mut(self.num_hands);
+
+                strategy_sum0
+                    .iter_mut()
+                    .zip(strategy_sum1.iter_mut())
+                    .zip(strategy0.iter())
+                    .zip(strategy1.iter())
+                    .zip(op_reach_prob.iter())
+                    .for_each(|((((sum_0, sum_1), strat0), strat1), prob)| {
+                        *sum_0 *= round_multiplier;
+                        *sum_0 += strat0 * prob;
+                        *sum_0 *= strategy_multiplier;
+
+                        *sum_1 *= round_multiplier;
+                        *sum_1 += strat1 * prob;
+                        *sum_1 *= strategy_multiplier;
+                    });
+            }
+            3 => {
+                let strategy0 = &strategies[0..self.num_hands];
+                let strategy1 = &strategies[self.num_hands..self.num_hands * 2];
+                let strategy2 = &strategies[self.num_hands * 2..];
+
+                let (strategy_sum0, strategy_sum12) = self.strategy_accumulator.split_at_mut(self.num_hands);
+                let (strategy_sum1, strategy_sum2) = strategy_sum12.split_at_mut(self.num_hands);
+
+                strategy_sum0
+                    .iter_mut()
+                    .zip(strategy_sum1.iter_mut())
+                    .zip(strategy_sum2.iter_mut())
+                    .zip(strategy0.iter())
+                    .zip(strategy1.iter())
+                    .zip(strategy2.iter())
+                    .zip(op_reach_prob.iter())
+                    .for_each(|((((((sum_0, sum_1), sum_2), strat0), strat1),strat2), prob)| {
+                        *sum_0 *= round_multiplier;
+                        *sum_0 += strat0 * prob;
+                        *sum_0 *= strategy_multiplier;
+
+                        *sum_1 *= round_multiplier;
+                        *sum_1 += strat1 * prob;
+                        *sum_1 *= strategy_multiplier;
+
+                        *sum_2 *= round_multiplier;
+                        *sum_2 += strat2 * prob;
+                        *sum_2 *= strategy_multiplier;
+                    });
+            }
+            _ => {
+                for action in 0..self.num_actions {
+                    let strategy_slice = &strategies[action * self.num_hands..];
+                    self.strategy_accumulator[action * self.num_hands..(action + 1) * self.num_hands]
+                        .iter_mut()
+                        .zip(op_reach_prob.iter())
+                        .zip(strategy_slice.iter())
+                        .for_each(|((strategy_sum, prob), strategy)| {
+                            *strategy_sum *= round_multiplier;
+                            *strategy_sum += prob * strategy;
+                            *strategy_sum *= strategy_multiplier;
+                        });
+                }
+            }
         }
     }
 

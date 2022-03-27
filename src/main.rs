@@ -1,3 +1,4 @@
+#![feature(core_intrinsics)]
 mod cfr;
 mod nodes;
 mod ranges;
@@ -24,7 +25,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let board: Board = [
         card_to_number("kc".to_string()),
         card_to_number("7h".to_string()),
-        card_to_number("2d".to_string()),
+        card_to_number("2c".to_string()),
         52,
         52,
     ];

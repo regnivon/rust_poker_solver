@@ -5,7 +5,11 @@ use crate::ranges::{
 };
 
 pub fn build_traversal_from_ranges(board: Board, oop_range: &str, ip_range: &str) -> Traversal {
-    let merged = construct_starting_range_from_string(format!("{},{}", oop_range, ip_range), &board);
+    let merged = if oop_range.eq_ignore_ascii_case("random") || ip_range.eq_ignore_ascii_case("random") {
+        construct_starting_range_from_string("random".to_string(), &board)
+    } else {
+        construct_starting_range_from_string(format!("{},{}", oop_range, ip_range), &board)
+    };
     let oop_combinations = build_player_specific_merged_range(oop_range.to_string(), &merged);
     let ip_combinations = build_player_specific_merged_range(ip_range.to_string(), &merged);
 
