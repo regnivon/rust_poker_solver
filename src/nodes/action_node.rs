@@ -1,12 +1,12 @@
-use std::cmp::{max, min};
 use super::node::{CfrNode, Node};
 use crate::nodes::node::{NodeResult, NodeResultType};
 use crate::{cfr::traversal::Traversal, ranges::combination::Board};
 #[cfg(all(target_arch = "aarch64"))]
 use std::arch::aarch64::*;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use std::arch::x86::*;
+use std::arch::x86_64::*;
 use std::borrow::Borrow;
+use std::cmp::{max, min};
 
 pub struct ActionNode {
     pub player_node: u8,
@@ -171,7 +171,8 @@ impl ActionNode {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
             if is_x86_feature_detected!("avx2") {
-                todo!()
+                // return self.get_strategy_fallback();
+                return unsafe { self.get_strategy_avx2_optimized() };
             }
         }
 
@@ -302,6 +303,274 @@ impl ActionNode {
         strategy
     }
 
+    #[cfg(all(target_arch = "x86_64"))]
+    #[target_feature(enable = "avx2")]
+    unsafe fn get_strategy_avx2_optimized(&self) -> Vec<f32> {
+        let nums = self.num_actions * self.num_hands;
+        if self.num_actions == 1 {
+            return vec![1.0; nums];
+        }
+
+        let mut strategy = vec![0.0; nums];
+        let left_over = self.num_hands % 8;
+        let simd_stop_index = self.num_hands - left_over;
+
+        let probability = 1.0 / (self.num_actions as f32);
+
+        for hand in simd_stop_index..self.num_hands {
+            let mut normalizing_value = 0.0;
+            for action in 0..self.num_actions {
+                if self.regret_accumulator[hand + action * self.num_hands] > 0.0 {
+                    normalizing_value += self.regret_accumulator[hand + action * self.num_hands];
+                }
+            }
+
+            if normalizing_value > 0.0 {
+                for action in 0..self.num_actions {
+                    if self.regret_accumulator[hand + action * self.num_hands] > 0.0 {
+                        strategy[hand + action * self.num_hands] = self.regret_accumulator
+                            [hand + action * self.num_hands]
+                            / normalizing_value
+                    }
+                }
+            } else {
+                for action in 0..self.num_actions {
+                    strategy[hand + action * self.num_hands] = probability;
+                }
+            }
+        }
+        let zeros = _mm256_set1_ps(0.0);
+        let probability_vec = _mm256_set1_ps(probability);
+
+        // loop unrolling here is very worth doing ~50% increases in speed and get strategy is 20% of runtime
+        // general case has some comments to make this semi understandable
+        match self.num_actions {
+            2 => {
+                let (strategy0, strategy1) = strategy.split_at_mut(self.num_hands);
+                for hand in (0..simd_stop_index).step_by(8) {
+                    let regret_sum0 = self.regret_accumulator.get_unchecked(hand);
+                    let regret_sum1 = self.regret_accumulator.get_unchecked(self.num_hands + hand);
+
+                    // sum positive regrets
+                    let regret_with_negatives_zeroed_0 = _mm256_max_ps(
+                        _mm256_loadu_ps(regret_sum0),
+                        zeros,
+                    );
+                    let regret_with_negatives_zeroed_1 = _mm256_max_ps(
+                        _mm256_loadu_ps(regret_sum1),
+                        zeros,
+                    );
+
+                    let norm = _mm256_add_ps(
+                        regret_with_negatives_zeroed_0,
+                        regret_with_negatives_zeroed_1,
+                    );
+
+                    let mask = _mm256_cmp_ps::<_CMP_EQ_OS>(zeros, norm);
+
+                    let result0 = _mm256_div_ps(
+                        regret_with_negatives_zeroed_0,
+                        norm,
+                    );
+                    let result1 = _mm256_div_ps(
+                        regret_with_negatives_zeroed_1,
+                        norm,
+                    );
+
+                    _mm256_storeu_ps(
+                        strategy0.get_unchecked_mut(hand),
+                        _mm256_blendv_ps(result0, probability_vec, mask),
+                    );
+                    _mm256_storeu_ps(
+                        strategy1.get_unchecked_mut(hand),
+                        _mm256_blendv_ps(result1, probability_vec, mask),
+                    );
+                }
+            }
+            3 => {
+                let (strategy0, strategy12) = strategy.split_at_mut(self.num_hands);
+                let (strategy1, strategy2) = strategy12.split_at_mut(self.num_hands);
+                for hand in (0..simd_stop_index).step_by(8) {
+                    let regret_sum0 = self.regret_accumulator.get_unchecked(hand);
+                    let regret_sum1 = self.regret_accumulator.get_unchecked(self.num_hands + hand);
+                    let regret_sum2 = self.regret_accumulator.get_unchecked(self.num_hands + self.num_hands + hand);
+
+                    // sum positive regrets
+                    let regret_with_negatives_zeroed_0 = _mm256_max_ps(
+                        _mm256_loadu_ps(regret_sum0),
+                        zeros,
+                    );
+                    let regret_with_negatives_zeroed_1 = _mm256_max_ps(
+                        _mm256_loadu_ps(regret_sum1),
+                        zeros,
+                    );
+                    let regret_with_negatives_zeroed_2 = _mm256_max_ps(
+                        _mm256_loadu_ps(regret_sum2),
+                        zeros,
+                    );
+
+                    let norm = _mm256_add_ps(
+                        _mm256_add_ps(
+                            regret_with_negatives_zeroed_0,
+                            regret_with_negatives_zeroed_1,
+                        ),
+                        regret_with_negatives_zeroed_2
+                    );
+
+                    let mask = _mm256_cmp_ps::<_CMP_EQ_OS>(zeros, norm);
+
+                    let result0 = _mm256_div_ps(
+                        regret_with_negatives_zeroed_0,
+                        norm,
+                    );
+                    let result1 = _mm256_div_ps(
+                        regret_with_negatives_zeroed_1,
+                        norm,
+                    );
+                    let result2 = _mm256_div_ps(
+                        regret_with_negatives_zeroed_2,
+                        norm,
+                    );
+
+                    _mm256_storeu_ps(
+                        strategy0.get_unchecked_mut(hand),
+                        _mm256_blendv_ps(result0, probability_vec, mask),
+                    );
+                    _mm256_storeu_ps(
+                        strategy1.get_unchecked_mut(hand),
+                        _mm256_blendv_ps(result1, probability_vec, mask),
+                    );
+                    _mm256_storeu_ps(
+                        strategy2.get_unchecked_mut(hand),
+                        _mm256_blendv_ps(result2, probability_vec, mask),
+                    );
+                }
+            }
+            4 => {
+                let (strategy0, strategy12) = strategy.split_at_mut(self.num_hands);
+                let (strategy1, strategy23) = strategy12.split_at_mut(self.num_hands);
+                let (strategy2, strategy3) = strategy23.split_at_mut(self.num_hands);
+                for hand in (0..simd_stop_index).step_by(8) {
+                    let regret_sum0 = self.regret_accumulator.get_unchecked(hand);
+                    let regret_sum1 = self.regret_accumulator.get_unchecked(self.num_hands + hand);
+                    let regret_sum2 = self.regret_accumulator.get_unchecked(self.num_hands + self.num_hands + hand);
+                    let regret_sum3 = self.regret_accumulator.get_unchecked(self.num_hands + self.num_hands + self.num_hands + hand);
+
+                    // sum positive regrets
+                    let regret_with_negatives_zeroed_0 = _mm256_max_ps(
+                        _mm256_loadu_ps(regret_sum0),
+                        zeros,
+                    );
+                    let regret_with_negatives_zeroed_1 = _mm256_max_ps(
+                        _mm256_loadu_ps(regret_sum1),
+                        zeros,
+                    );
+                    let regret_with_negatives_zeroed_2 = _mm256_max_ps(
+                        _mm256_loadu_ps(regret_sum2),
+                        zeros,
+                    );
+                    let regret_with_negatives_zeroed_3 = _mm256_max_ps(
+                        _mm256_loadu_ps(regret_sum3),
+                        zeros,
+                    );
+
+                    let norm = _mm256_add_ps(
+                        _mm256_add_ps(
+                            _mm256_add_ps(
+                                regret_with_negatives_zeroed_0,
+                                regret_with_negatives_zeroed_1,
+                            ),
+                            regret_with_negatives_zeroed_2
+                        ),
+                        regret_with_negatives_zeroed_3
+                    );
+
+                    let mask = _mm256_cmp_ps::<_CMP_EQ_OS>(zeros, norm);
+
+                    let result0 = _mm256_div_ps(
+                        regret_with_negatives_zeroed_0,
+                        norm,
+                    );
+                    let result1 = _mm256_div_ps(
+                        regret_with_negatives_zeroed_1,
+                        norm,
+                    );
+                    let result2 = _mm256_div_ps(
+                        regret_with_negatives_zeroed_2,
+                        norm,
+                    );
+                    let result3 = _mm256_div_ps(
+                        regret_with_negatives_zeroed_3,
+                        norm,
+                    );
+
+                    _mm256_storeu_ps(
+                        strategy0.get_unchecked_mut(hand),
+                        _mm256_blendv_ps(result0, probability_vec, mask),
+                    );
+                    _mm256_storeu_ps(
+                        strategy1.get_unchecked_mut(hand),
+                        _mm256_blendv_ps(result1, probability_vec, mask),
+                    );
+                    _mm256_storeu_ps(
+                        strategy2.get_unchecked_mut(hand),
+                        _mm256_blendv_ps(result2, probability_vec, mask),
+                    );
+                    _mm256_storeu_ps(
+                        strategy3.get_unchecked_mut(hand),
+                        _mm256_blendv_ps(result3, probability_vec, mask),
+                    );
+                }
+            }
+            _ => {
+                for hand in (0..simd_stop_index).step_by(8) {
+                    let mut normalizing_vec_ptr = [0.0; 8].as_mut_ptr();
+                    for action in 0..self.num_actions {
+                        let regret_with_negatives_zeroed = _mm256_max_ps(
+                            _mm256_loadu_ps(
+                                self.regret_accumulator
+                                    .get_unchecked(hand + action * self.num_hands),
+                            ),
+                            zeros,
+                        );
+
+                        let regret_sum = _mm256_add_ps(
+                            _mm256_loadu_ps(normalizing_vec_ptr),
+                            regret_with_negatives_zeroed,
+                        );
+
+                        _mm256_storeu_ps(normalizing_vec_ptr, regret_sum);
+                    }
+
+                    for action in 0..self.num_actions {
+                        let norm = _mm256_loadu_ps(normalizing_vec_ptr);
+                        // div by 0 results in inf values, we find the 0 values here
+                        let mask = _mm256_cmp_ps::<_CMP_EQ_OS>(zeros, norm);
+                        let regret_with_negatives_zeroed = _mm256_max_ps(
+                            _mm256_loadu_ps(
+                                self.regret_accumulator
+                                    .get_unchecked(hand + action * self.num_hands),
+                            ),
+                            zeros,
+                        );
+
+                        let result = _mm256_div_ps(regret_with_negatives_zeroed, norm);
+
+                        // using the mask above, take the probability_vec if the mask was true (norm = 0)
+                        // and otherwise take the real result
+                        _mm256_storeu_ps(
+                            strategy.get_unchecked_mut(hand + action * self.num_hands),
+                            _mm256_blendv_ps(result, probability_vec, mask),
+                        );
+                    }
+                }
+            }
+        }
+
+        strategy
+    }
+
+    #[cfg(all(target_arch = "aarch64"))]
     #[target_feature(enable = "neon")]
     unsafe fn get_strategy_neon_optimized(&self) -> Vec<f32> {
         let nums = self.num_actions * self.num_hands;
@@ -319,8 +588,7 @@ impl ActionNode {
             let mut normalizing_value = 0.0;
             for action in 0..self.num_actions {
                 if self.regret_accumulator[hand + action * self.num_hands] > 0.0 {
-                    normalizing_value +=
-                        self.regret_accumulator[hand + action * self.num_hands];
+                    normalizing_value += self.regret_accumulator[hand + action * self.num_hands];
                 }
             }
 
@@ -352,14 +620,8 @@ impl ActionNode {
                     let regret_sum1 = self.regret_accumulator.get_unchecked(self.num_hands + hand);
 
                     // sum positive regrets
-                    let regret_with_negatives_zeroed_0 = vmaxq_f32(
-                        vld1q_f32(regret_sum0),
-                        zeros,
-                    );
-                    let regret_with_negatives_zeroed_1 = vmaxq_f32(
-                        vld1q_f32(regret_sum1),
-                        zeros,
-                    );
+                    let regret_with_negatives_zeroed_0 = vmaxq_f32(vld1q_f32(regret_sum0), zeros);
+                    let regret_with_negatives_zeroed_1 = vmaxq_f32(vld1q_f32(regret_sum1), zeros);
                     vst1q_f32(
                         normalizing_vec_ptr,
                         vaddq_f32(
@@ -371,14 +633,8 @@ impl ActionNode {
                     let norm = vld1q_f32(normalizing_vec_ptr);
                     let mask = vceqq_f32(zeros, norm);
 
-                    let result0 = vdivq_f32(
-                        regret_with_negatives_zeroed_0,
-                        norm,
-                    );
-                    let result1 = vdivq_f32(
-                        regret_with_negatives_zeroed_1,
-                        norm,
-                    );
+                    let result0 = vdivq_f32(regret_with_negatives_zeroed_0, norm);
+                    let result1 = vdivq_f32(regret_with_negatives_zeroed_1, norm);
 
                     vst1q_f32(
                         strategy0.get_unchecked_mut(hand),
@@ -397,21 +653,14 @@ impl ActionNode {
                     let mut normalizing_vec_ptr = [0.0; 4].as_mut_ptr();
                     let regret_sum0 = self.regret_accumulator.get_unchecked(hand);
                     let regret_sum1 = self.regret_accumulator.get_unchecked(self.num_hands + hand);
-                    let regret_sum2 = self.regret_accumulator.get_unchecked(self.num_hands + self.num_hands + hand);
+                    let regret_sum2 = self
+                        .regret_accumulator
+                        .get_unchecked(self.num_hands + self.num_hands + hand);
 
                     // sum positive regrets
-                    let regret_with_negatives_zeroed_0 = vmaxq_f32(
-                        vld1q_f32(regret_sum0),
-                        zeros,
-                    );
-                    let regret_with_negatives_zeroed_1 = vmaxq_f32(
-                        vld1q_f32(regret_sum1),
-                        zeros,
-                    );
-                    let regret_with_negatives_zeroed_2 = vmaxq_f32(
-                        vld1q_f32(regret_sum2),
-                        zeros,
-                    );
+                    let regret_with_negatives_zeroed_0 = vmaxq_f32(vld1q_f32(regret_sum0), zeros);
+                    let regret_with_negatives_zeroed_1 = vmaxq_f32(vld1q_f32(regret_sum1), zeros);
+                    let regret_with_negatives_zeroed_2 = vmaxq_f32(vld1q_f32(regret_sum2), zeros);
 
                     vst1q_f32(
                         normalizing_vec_ptr,
@@ -427,18 +676,9 @@ impl ActionNode {
                     let norm = vld1q_f32(normalizing_vec_ptr);
                     let mask = vceqq_f32(zeros, norm);
 
-                    let result0 = vdivq_f32(
-                        regret_with_negatives_zeroed_0,
-                        norm,
-                    );
-                    let result1 = vdivq_f32(
-                        regret_with_negatives_zeroed_1,
-                        norm,
-                    );
-                    let result2 = vdivq_f32(
-                        regret_with_negatives_zeroed_2,
-                        norm,
-                    );
+                    let result0 = vdivq_f32(regret_with_negatives_zeroed_0, norm);
+                    let result1 = vdivq_f32(regret_with_negatives_zeroed_1, norm);
+                    let result2 = vdivq_f32(regret_with_negatives_zeroed_2, norm);
 
                     vst1q_f32(
                         strategy0.get_unchecked_mut(hand),
@@ -462,26 +702,18 @@ impl ActionNode {
                     let mut normalizing_vec_ptr = [0.0; 4].as_mut_ptr();
                     let regret_sum0 = self.regret_accumulator.get_unchecked(hand);
                     let regret_sum1 = self.regret_accumulator.get_unchecked(self.num_hands + hand);
-                    let regret_sum2 = self.regret_accumulator.get_unchecked(self.num_hands + self.num_hands + hand);
-                    let regret_sum3 = self.regret_accumulator.get_unchecked(self.num_hands + self.num_hands + self.num_hands + hand);
+                    let regret_sum2 = self
+                        .regret_accumulator
+                        .get_unchecked(self.num_hands + self.num_hands + hand);
+                    let regret_sum3 = self
+                        .regret_accumulator
+                        .get_unchecked(self.num_hands + self.num_hands + self.num_hands + hand);
 
                     // sum positive regrets
-                    let regret_with_negatives_zeroed_0 = vmaxq_f32(
-                        vld1q_f32(regret_sum0),
-                        zeros,
-                    );
-                    let regret_with_negatives_zeroed_1 = vmaxq_f32(
-                        vld1q_f32(regret_sum1),
-                        zeros,
-                    );
-                    let regret_with_negatives_zeroed_2 = vmaxq_f32(
-                        vld1q_f32(regret_sum2),
-                        zeros,
-                    );
-                    let regret_with_negatives_zeroed_3 = vmaxq_f32(
-                        vld1q_f32(regret_sum3),
-                        zeros,
-                    );
+                    let regret_with_negatives_zeroed_0 = vmaxq_f32(vld1q_f32(regret_sum0), zeros);
+                    let regret_with_negatives_zeroed_1 = vmaxq_f32(vld1q_f32(regret_sum1), zeros);
+                    let regret_with_negatives_zeroed_2 = vmaxq_f32(vld1q_f32(regret_sum2), zeros);
+                    let regret_with_negatives_zeroed_3 = vmaxq_f32(vld1q_f32(regret_sum3), zeros);
 
                     vst1q_f32(
                         normalizing_vec_ptr,
@@ -500,22 +732,10 @@ impl ActionNode {
                     let norm = vld1q_f32(normalizing_vec_ptr);
                     let mask = vceqq_f32(zeros, norm);
 
-                    let result0 = vdivq_f32(
-                        regret_with_negatives_zeroed_0,
-                        norm,
-                    );
-                    let result1 = vdivq_f32(
-                        regret_with_negatives_zeroed_1,
-                        norm,
-                    );
-                    let result2 = vdivq_f32(
-                        regret_with_negatives_zeroed_2,
-                        norm,
-                    );
-                    let result3 = vdivq_f32(
-                        regret_with_negatives_zeroed_3,
-                        norm,
-                    );
+                    let result0 = vdivq_f32(regret_with_negatives_zeroed_0, norm);
+                    let result1 = vdivq_f32(regret_with_negatives_zeroed_1, norm);
+                    let result2 = vdivq_f32(regret_with_negatives_zeroed_2, norm);
+                    let result3 = vdivq_f32(regret_with_negatives_zeroed_3, norm);
 
                     vst1q_f32(
                         strategy0.get_unchecked_mut(hand),
@@ -540,16 +760,15 @@ impl ActionNode {
                     let mut normalizing_vec_ptr = [0.0; 4].as_mut_ptr();
                     for action in 0..self.num_actions {
                         let regret_with_negatives_zeroed = vmaxq_f32(
-                            vld1q_f32(self.regret_accumulator
-                                .get_unchecked(hand + action * self.num_hands)
+                            vld1q_f32(
+                                self.regret_accumulator
+                                    .get_unchecked(hand + action * self.num_hands),
                             ),
                             zeros,
                         );
 
-                        let regret_sum = vaddq_f32(
-                            vld1q_f32(normalizing_vec_ptr),
-                            regret_with_negatives_zeroed,
-                        );
+                        let regret_sum =
+                            vaddq_f32(vld1q_f32(normalizing_vec_ptr), regret_with_negatives_zeroed);
 
                         vst1q_f32(normalizing_vec_ptr, regret_sum);
                     }
@@ -559,16 +778,14 @@ impl ActionNode {
                         // div by 0 results in inf values, we find the 0 values here
                         let mask = vceqq_f32(zeros, norm);
                         let regret_with_negatives_zeroed = vmaxq_f32(
-                            vld1q_f32(self.regret_accumulator
-                                .get_unchecked(hand + action * self.num_hands)
+                            vld1q_f32(
+                                self.regret_accumulator
+                                    .get_unchecked(hand + action * self.num_hands),
                             ),
                             zeros,
                         );
 
-                        let result = vdivq_f32(
-                            regret_with_negatives_zeroed,
-                            norm,
-                        );
+                        let result = vdivq_f32(regret_with_negatives_zeroed, norm);
 
                         // using the mask above, take the probability_vec if the mask was true (norm = 0)
                         // and otherwise take the real result
@@ -652,7 +869,8 @@ impl ActionNode {
                 let strategy0 = &strategies[0..self.num_hands];
                 let strategy1 = &strategies[self.num_hands..];
 
-                let (strategy_sum0, strategy_sum1) = self.strategy_accumulator.split_at_mut(self.num_hands);
+                let (strategy_sum0, strategy_sum1) =
+                    self.strategy_accumulator.split_at_mut(self.num_hands);
 
                 strategy_sum0
                     .iter_mut()
@@ -661,8 +879,10 @@ impl ActionNode {
                     .zip(strategy1.iter())
                     .zip(op_reach_prob.iter())
                     .for_each(|((((sum_0, sum_1), strat0), strat1), prob)| {
-                        *sum_0 = ((*sum_0 * round_multiplier) + (strat0 * prob)) * strategy_multiplier;
-                        *sum_1 = ((*sum_1 * round_multiplier) + (strat1 * prob)) * strategy_multiplier;
+                        *sum_0 =
+                            ((*sum_0 * round_multiplier) + (strat0 * prob)) * strategy_multiplier;
+                        *sum_1 =
+                            ((*sum_1 * round_multiplier) + (strat1 * prob)) * strategy_multiplier;
                     });
             }
             3 => {
@@ -670,7 +890,8 @@ impl ActionNode {
                 let strategy1 = &strategies[self.num_hands..self.num_hands * 2];
                 let strategy2 = &strategies[self.num_hands * 2..];
 
-                let (strategy_sum0, strategy_sum12) = self.strategy_accumulator.split_at_mut(self.num_hands);
+                let (strategy_sum0, strategy_sum12) =
+                    self.strategy_accumulator.split_at_mut(self.num_hands);
                 let (strategy_sum1, strategy_sum2) = strategy_sum12.split_at_mut(self.num_hands);
 
                 strategy_sum0
@@ -681,21 +902,29 @@ impl ActionNode {
                     .zip(strategy1.iter())
                     .zip(strategy2.iter())
                     .zip(op_reach_prob.iter())
-                    .for_each(|((((((sum_0, sum_1), sum_2), strat0), strat1), strat2), prob)| {
-                        *sum_0 = ((*sum_0 * round_multiplier) + (strat0 * prob)) * strategy_multiplier;
-                        *sum_1 = ((*sum_1 * round_multiplier) + (strat1 * prob)) * strategy_multiplier;
-                        *sum_2 = ((*sum_2 * round_multiplier) + (strat2 * prob)) * strategy_multiplier;
-                    });
+                    .for_each(
+                        |((((((sum_0, sum_1), sum_2), strat0), strat1), strat2), prob)| {
+                            *sum_0 = ((*sum_0 * round_multiplier) + (strat0 * prob))
+                                * strategy_multiplier;
+                            *sum_1 = ((*sum_1 * round_multiplier) + (strat1 * prob))
+                                * strategy_multiplier;
+                            *sum_2 = ((*sum_2 * round_multiplier) + (strat2 * prob))
+                                * strategy_multiplier;
+                        },
+                    );
             }
             _ => {
                 for action in 0..self.num_actions {
                     let strategy_slice = &strategies[action * self.num_hands..];
-                    self.strategy_accumulator[action * self.num_hands..(action + 1) * self.num_hands]
+                    self.strategy_accumulator
+                        [action * self.num_hands..(action + 1) * self.num_hands]
                         .iter_mut()
                         .zip(op_reach_prob.iter())
                         .zip(strategy_slice.iter())
                         .for_each(|((strategy_sum, prob), strategy)| {
-                            *strategy_sum = ((*strategy_sum * round_multiplier) + (strategy * prob)) * strategy_multiplier;
+                            *strategy_sum = ((*strategy_sum * round_multiplier)
+                                + (strategy * prob))
+                                * strategy_multiplier;
                         });
                 }
             }
@@ -775,23 +1004,21 @@ use rust_poker::hand_evaluator::{evaluate, Hand, CARDS};
 use test::Bencher;
 use tracing::info;
 
-
 #[cfg(test)]
 mod tests {
-    use std::arch::aarch64::{float32x4_t, int32x4_t, vmax_f32, vmaxq_f32, vmaxq_s32, vminq_s32};
-    use rust_poker::hand_evaluator::{CARDS, evaluate, Hand};
     use crate::{
         cfr::traversal::Traversal,
         nodes::node::CfrNode,
         ranges::{range_manager::RangeManager, utility::construct_starting_range_from_string},
     };
     use rand::random;
+    use rust_poker::hand_evaluator::{evaluate, Hand, CARDS};
 
     extern crate test;
 
-    use test::Bencher;
     use crate::cfr::traversal::build_traversal_from_ranges;
     use crate::nodes::action_node::ActionNode;
+    use test::Bencher;
 
     const NUM_HANDS: usize = 600;
     const NUM_ACTIONS: usize = 4;
@@ -805,14 +1032,16 @@ mod tests {
             ip_stack: 0.0,
             oop_stack: 0.0,
             next_nodes: vec![],
-            regret_accumulator: (0..NUM_ACTIONS * NUM_HANDS).map(|_| {
-                let r: f32 = random();
-                if r < 0.5 {
-                    -100.0 * r
-                } else {
-                    r * 100.0
-                }
-            }).collect(),
+            regret_accumulator: (0..NUM_ACTIONS * NUM_HANDS)
+                .map(|_| {
+                    let r: f32 = random();
+                    if r < 0.5 {
+                        -100.0 * r
+                    } else {
+                        r * 100.0
+                    }
+                })
+                .collect(),
             strategy_accumulator: vec![0.0; NUM_ACTIONS * NUM_HANDS],
             node_ev: None,
         }
@@ -854,6 +1083,27 @@ mod tests {
         });
     }
 
+    #[cfg(all(target_arch = "x86_64"))]
+    #[bench]
+    fn avx2_strategy(b: &mut Bencher) {
+        let mut node = build_node();
+
+        b.iter(|| {
+            test::black_box(unsafe { node.get_strategy_avx2_optimized() });
+        });
+    }
+
+    #[cfg(all(target_arch = "x86_64"))]
+    #[test]
+    fn test_strategy_avx2() {
+        let mut node = build_node();
+
+        let r1 = node.get_strategy_fallback();
+        let r2 = unsafe { node.get_strategy_avx2_optimized() };
+
+        assert_eq!(r1, r2);
+    }
+
     #[cfg(all(target_arch = "aarch64"))]
     #[bench]
     fn neon_strategy(b: &mut Bencher) {
@@ -864,11 +1114,12 @@ mod tests {
         });
     }
 
+    #[cfg(all(target_arch = "aarch64"))]
     #[test]
     fn test_utility() {
         let mut node = build_node();
 
-        let r1 = node.get_strategy();
+        let r1 = node.get_strategy_fallback();
         let r2 = unsafe { node.get_strategy_neon_optimized() };
 
         assert_eq!(r1, r2);
