@@ -2,7 +2,10 @@ use std::cmp::{max, min};
 use super::node::{CfrNode, Node};
 use crate::nodes::node::{NodeResult, NodeResultType};
 use crate::{cfr::traversal::Traversal, ranges::combination::Board};
+#[cfg(all(target_arch = "aarch64"))]
 use std::arch::aarch64::*;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+use std::arch::x86::*;
 use std::borrow::Borrow;
 
 pub struct ActionNode {
@@ -167,7 +170,7 @@ impl ActionNode {
     fn get_strategy(&self) -> Vec<f32> {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
-            if is_x86_feature_detected!("ssse3") {
+            if is_x86_feature_detected!("avx2") {
                 todo!()
             }
         }
@@ -310,7 +313,6 @@ impl ActionNode {
         let left_over = self.num_hands % 4;
         let simd_stop_index = self.num_hands - left_over;
 
-
         let probability = 1.0 / (self.num_actions as f32);
 
         for hand in simd_stop_index..self.num_hands {
@@ -352,18 +354,18 @@ impl ActionNode {
                     // sum positive regrets
                     let regret_with_negatives_zeroed_0 = vmaxq_f32(
                         vld1q_f32(regret_sum0),
-                        zeros
+                        zeros,
                     );
                     let regret_with_negatives_zeroed_1 = vmaxq_f32(
                         vld1q_f32(regret_sum1),
-                        zeros
+                        zeros,
                     );
                     vst1q_f32(
                         normalizing_vec_ptr,
                         vaddq_f32(
                             regret_with_negatives_zeroed_0,
-                            regret_with_negatives_zeroed_1
-                        )
+                            regret_with_negatives_zeroed_1,
+                        ),
                     );
 
                     let norm = vld1q_f32(normalizing_vec_ptr);
@@ -387,7 +389,7 @@ impl ActionNode {
                         vbslq_f32(mask, probability_vec, result1),
                     );
                 }
-            },
+            }
             3 => {
                 let (strategy0, strategy12) = strategy.split_at_mut(self.num_hands);
                 let (strategy1, strategy2) = strategy12.split_at_mut(self.num_hands);
@@ -400,15 +402,15 @@ impl ActionNode {
                     // sum positive regrets
                     let regret_with_negatives_zeroed_0 = vmaxq_f32(
                         vld1q_f32(regret_sum0),
-                        zeros
+                        zeros,
                     );
                     let regret_with_negatives_zeroed_1 = vmaxq_f32(
                         vld1q_f32(regret_sum1),
-                        zeros
+                        zeros,
                     );
                     let regret_with_negatives_zeroed_2 = vmaxq_f32(
                         vld1q_f32(regret_sum2),
-                        zeros
+                        zeros,
                     );
 
                     vst1q_f32(
@@ -416,10 +418,10 @@ impl ActionNode {
                         vaddq_f32(
                             vaddq_f32(
                                 regret_with_negatives_zeroed_0,
-                                regret_with_negatives_zeroed_1
+                                regret_with_negatives_zeroed_1,
                             ),
-                            regret_with_negatives_zeroed_2
-                        )
+                            regret_with_negatives_zeroed_2,
+                        ),
                     );
 
                     let norm = vld1q_f32(normalizing_vec_ptr);
@@ -451,7 +453,7 @@ impl ActionNode {
                         vbslq_f32(mask, probability_vec, result2),
                     );
                 }
-            },
+            }
             4 => {
                 let (strategy0, strategy12) = strategy.split_at_mut(self.num_hands);
                 let (strategy1, strategy23) = strategy12.split_at_mut(self.num_hands);
@@ -466,19 +468,19 @@ impl ActionNode {
                     // sum positive regrets
                     let regret_with_negatives_zeroed_0 = vmaxq_f32(
                         vld1q_f32(regret_sum0),
-                        zeros
+                        zeros,
                     );
                     let regret_with_negatives_zeroed_1 = vmaxq_f32(
                         vld1q_f32(regret_sum1),
-                        zeros
+                        zeros,
                     );
                     let regret_with_negatives_zeroed_2 = vmaxq_f32(
                         vld1q_f32(regret_sum2),
-                        zeros
+                        zeros,
                     );
                     let regret_with_negatives_zeroed_3 = vmaxq_f32(
                         vld1q_f32(regret_sum3),
-                        zeros
+                        zeros,
                     );
 
                     vst1q_f32(
@@ -487,12 +489,12 @@ impl ActionNode {
                             vaddq_f32(
                                 vaddq_f32(
                                     regret_with_negatives_zeroed_0,
-                                    regret_with_negatives_zeroed_1
+                                    regret_with_negatives_zeroed_1,
                                 ),
-                                regret_with_negatives_zeroed_2
+                                regret_with_negatives_zeroed_2,
                             ),
-                            regret_with_negatives_zeroed_3
-                        )
+                            regret_with_negatives_zeroed_3,
+                        ),
                     );
 
                     let norm = vld1q_f32(normalizing_vec_ptr);
@@ -612,7 +614,7 @@ impl ActionNode {
     fn regret_sum_update(
         &mut self,
         traversal: &Traversal,
-        action_utility: Vec<Vec<f32>>,
+        action_utility: &Vec<Vec<f32>>,
         node_utility: &[f32],
     ) {
         let alpha = f64::from(traversal.iteration).powf(1.45);
@@ -726,7 +728,7 @@ impl ActionNode {
             action_utility[i] = result;
         }
 
-        self.regret_sum_update(traversal, action_utility, node_utility)
+        self.regret_sum_update(traversal, &action_utility, node_utility)
     }
 
     fn opponent_cfr(
@@ -771,6 +773,7 @@ use crate::cfr::traversal::build_traversal_from_ranges;
 use crate::ranges::utility::construct_starting_range_from_string;
 use rust_poker::hand_evaluator::{evaluate, Hand, CARDS};
 use test::Bencher;
+use tracing::info;
 
 
 #[cfg(test)]
@@ -787,10 +790,11 @@ mod tests {
     extern crate test;
 
     use test::Bencher;
+    use crate::cfr::traversal::build_traversal_from_ranges;
     use crate::nodes::action_node::ActionNode;
 
-    const NUM_HANDS: usize = 603;
-    const NUM_ACTIONS: usize = 2;
+    const NUM_HANDS: usize = 600;
+    const NUM_ACTIONS: usize = 4;
 
     fn build_node() -> ActionNode {
         ActionNode {
@@ -809,18 +813,9 @@ mod tests {
                     r * 100.0
                 }
             }).collect(),
-            strategy_accumulator: vec![],
+            strategy_accumulator: vec![0.0; NUM_ACTIONS * NUM_HANDS],
             node_ev: None,
         }
-    }
-
-    #[bench]
-    fn neon_strategy(b: &mut Bencher) {
-        let mut node = build_node();
-
-        b.iter(|| {
-            test::black_box(unsafe { node.get_strategy_neon_optimized() });
-        });
     }
 
     #[bench]
@@ -829,6 +824,43 @@ mod tests {
 
         b.iter(|| {
             test::black_box(node.get_strategy_fallback());
+        });
+    }
+
+    #[bench]
+    fn standard_update_strategy(b: &mut Bencher) {
+        let mut node = build_node();
+
+        let strategy = node.get_strategy();
+        let traversal = build_traversal_from_ranges([2, 4, 5, 52, 52], "random", "random");
+        let prob = vec![0.5; NUM_HANDS];
+
+        b.iter(|| {
+            test::black_box(node.strategy_sum_update(&traversal, &prob, &strategy));
+        });
+    }
+
+    #[bench]
+    fn standard_update_regret(b: &mut Bencher) {
+        let mut node = build_node();
+
+        let strategy = node.get_strategy();
+        let traversal = build_traversal_from_ranges([2, 4, 5, 52, 52], "random", "random");
+        let util = vec![0.5; NUM_HANDS];
+        let action = vec![vec![0.5; NUM_HANDS]; NUM_ACTIONS];
+
+        b.iter(|| {
+            test::black_box(node.regret_sum_update(&traversal, &action, &util));
+        });
+    }
+
+    #[cfg(all(target_arch = "aarch64"))]
+    #[bench]
+    fn neon_strategy(b: &mut Bencher) {
+        let mut node = build_node();
+
+        b.iter(|| {
+            test::black_box(unsafe { node.get_strategy_neon_optimized() });
         });
     }
 

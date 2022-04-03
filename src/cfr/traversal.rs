@@ -1,3 +1,4 @@
+use tracing::info;
 use crate::ranges::{
     combination::{Board, Combination},
     range_manager::{RangeManager, RangeManagers, DefaultRangeManager, IsomorphicRangeManager},
@@ -109,5 +110,12 @@ impl Traversal {
             return self.oop_rm.merge_canonical_utilities(board, utility);
         }
         self.ip_rm.merge_canonical_utilities(board, utility)
+    }
+
+    pub fn get_rank_table(&self, board: &Board) -> &[usize] {
+        if self.traverser == 1 {
+            return self.oop_rm.get_rank_table_for_board(board);
+        }
+        self.ip_rm.get_rank_table_for_board(board)
     }
 }

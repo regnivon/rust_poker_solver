@@ -26,7 +26,7 @@ pub async fn run_trainer(
 
     let mut game = Game::new(traversal, params, board);
 
-    game.train(0.25);
+    game.train(0.5);
     let file_name = format!(
         "{}{}{}.json",
         number_to_card(board[0]),
