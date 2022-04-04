@@ -171,7 +171,6 @@ impl ActionNode {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
             if is_x86_feature_detected!("avx2") {
-                // return self.get_strategy_fallback();
                 return unsafe { self.get_strategy_avx2_optimized() };
             }
         }
@@ -615,22 +614,17 @@ impl ActionNode {
             2 => {
                 let (strategy0, strategy1) = strategy.split_at_mut(self.num_hands);
                 for hand in (0..simd_stop_index).step_by(4) {
-                    let mut normalizing_vec_ptr = [0.0; 4].as_mut_ptr();
                     let regret_sum0 = self.regret_accumulator.get_unchecked(hand);
                     let regret_sum1 = self.regret_accumulator.get_unchecked(self.num_hands + hand);
 
                     // sum positive regrets
                     let regret_with_negatives_zeroed_0 = vmaxq_f32(vld1q_f32(regret_sum0), zeros);
                     let regret_with_negatives_zeroed_1 = vmaxq_f32(vld1q_f32(regret_sum1), zeros);
-                    vst1q_f32(
-                        normalizing_vec_ptr,
-                        vaddq_f32(
-                            regret_with_negatives_zeroed_0,
-                            regret_with_negatives_zeroed_1,
-                        ),
-                    );
 
-                    let norm = vld1q_f32(normalizing_vec_ptr);
+                    let norm = vaddq_f32(
+                        regret_with_negatives_zeroed_0,
+                        regret_with_negatives_zeroed_1,
+                    );
                     let mask = vceqq_f32(zeros, norm);
 
                     let result0 = vdivq_f32(regret_with_negatives_zeroed_0, norm);
@@ -650,7 +644,6 @@ impl ActionNode {
                 let (strategy0, strategy12) = strategy.split_at_mut(self.num_hands);
                 let (strategy1, strategy2) = strategy12.split_at_mut(self.num_hands);
                 for hand in (0..simd_stop_index).step_by(4) {
-                    let mut normalizing_vec_ptr = [0.0; 4].as_mut_ptr();
                     let regret_sum0 = self.regret_accumulator.get_unchecked(hand);
                     let regret_sum1 = self.regret_accumulator.get_unchecked(self.num_hands + hand);
                     let regret_sum2 = self
@@ -662,18 +655,14 @@ impl ActionNode {
                     let regret_with_negatives_zeroed_1 = vmaxq_f32(vld1q_f32(regret_sum1), zeros);
                     let regret_with_negatives_zeroed_2 = vmaxq_f32(vld1q_f32(regret_sum2), zeros);
 
-                    vst1q_f32(
-                        normalizing_vec_ptr,
+                    let norm = vaddq_f32(
                         vaddq_f32(
-                            vaddq_f32(
-                                regret_with_negatives_zeroed_0,
-                                regret_with_negatives_zeroed_1,
-                            ),
-                            regret_with_negatives_zeroed_2,
+                            regret_with_negatives_zeroed_0,
+                            regret_with_negatives_zeroed_1,
                         ),
+                        regret_with_negatives_zeroed_2,
                     );
 
-                    let norm = vld1q_f32(normalizing_vec_ptr);
                     let mask = vceqq_f32(zeros, norm);
 
                     let result0 = vdivq_f32(regret_with_negatives_zeroed_0, norm);
@@ -699,7 +688,6 @@ impl ActionNode {
                 let (strategy1, strategy23) = strategy12.split_at_mut(self.num_hands);
                 let (strategy2, strategy3) = strategy23.split_at_mut(self.num_hands);
                 for hand in (0..simd_stop_index).step_by(4) {
-                    let mut normalizing_vec_ptr = [0.0; 4].as_mut_ptr();
                     let regret_sum0 = self.regret_accumulator.get_unchecked(hand);
                     let regret_sum1 = self.regret_accumulator.get_unchecked(self.num_hands + hand);
                     let regret_sum2 = self
@@ -715,21 +703,17 @@ impl ActionNode {
                     let regret_with_negatives_zeroed_2 = vmaxq_f32(vld1q_f32(regret_sum2), zeros);
                     let regret_with_negatives_zeroed_3 = vmaxq_f32(vld1q_f32(regret_sum3), zeros);
 
-                    vst1q_f32(
-                        normalizing_vec_ptr,
+                    let norm = vaddq_f32(
                         vaddq_f32(
                             vaddq_f32(
-                                vaddq_f32(
-                                    regret_with_negatives_zeroed_0,
-                                    regret_with_negatives_zeroed_1,
-                                ),
-                                regret_with_negatives_zeroed_2,
+                                regret_with_negatives_zeroed_0,
+                                regret_with_negatives_zeroed_1,
                             ),
-                            regret_with_negatives_zeroed_3,
+                            regret_with_negatives_zeroed_2,
                         ),
+                        regret_with_negatives_zeroed_3,
                     );
 
-                    let norm = vld1q_f32(normalizing_vec_ptr);
                     let mask = vceqq_f32(zeros, norm);
 
                     let result0 = vdivq_f32(regret_with_negatives_zeroed_0, norm);
