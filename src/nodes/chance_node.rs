@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use crate::nodes::node::{CfrNode, Node, NodeResult, NodeResultType};
 use crate::{
     cfr::traversal::Traversal,
@@ -28,7 +29,8 @@ impl CfrNode for ChanceNode {
         op_reach_prob: &[f32],
         board: &Board,
     ) -> Vec<f32> {
-        let mut result = vec![0.0; traversal.get_num_hands_for_traverser(board)];
+        let num_hands = traversal.get_num_hands_for_traverser(board);
+        let mut result = vec![0.0; num_hands];
         let next_boards: Vec<Board> = self
             .next_cards
             .iter()
@@ -69,14 +71,7 @@ impl CfrNode for ChanceNode {
                 .collect()
         };
 
-        for (runout, weight) in sub_results.iter().zip(self.next_weights.iter()) {
-            result
-                .iter_mut()
-                .zip(runout.iter())
-                .for_each(|(utility, runout_utility)| {
-                    *utility += runout_utility * f32::from(*weight);
-                });
-        }
+        merge_subgame_results(&mut result, &self.next_weights, &sub_results);
 
         let hands = traversal.get_range_for_active_player(board);
 
@@ -217,7 +212,18 @@ impl ChanceNode {
     }
 }
 
-fn build_next(board: &Board, next_cards: &mut Vec<u8>, next_weights: &mut Vec<i8>) {
+fn merge_subgame_results(result: &mut [f32], weights: &[i8], sub_results: &[Vec<f32>]) {
+    for (runout, &weight) in sub_results.iter().zip(weights.iter()) {
+        result
+            .iter_mut()
+            .zip(runout.iter())
+            .for_each(|(utility, runout_utility)| {
+                *utility += runout_utility * f32::from(weight);
+            });
+    }
+}
+
+pub fn build_next(board: &Board, next_cards: &mut Vec<u8>, next_weights: &mut Vec<i8>) {
     let suit_groups = if board_has_turn(board) {
         let flop_groups = build_initial_suit_groups(&[board[0], board[1], board[2], 52, 52]);
         build_next_suit_groups(board, &flop_groups)
@@ -251,7 +257,37 @@ fn build_next(board: &Board, next_cards: &mut Vec<u8>, next_weights: &mut Vec<i8
 mod tests {
     use crate::ranges::{combination::Board, utility::card_to_number};
 
+    extern crate test;
+
+    use rand::random;
+    use test::Bencher;
+
     use super::*;
+
+    const NUM_HANDS: usize = 1200;
+    const NUM_SUBGAMES: usize = 48;
+
+    #[bench]
+    fn standard_subgame_merge(b: &mut Bencher) {
+        let mut result = vec![0.0; NUM_HANDS];
+
+        let subgame_results = (0..NUM_SUBGAMES).map(|_| {
+            (0..NUM_HANDS).map(|_| {
+                let r: f32 = random();
+                if r < 0.5 {
+                    -100.0 * r
+                } else {
+                    r * 100.0
+                }
+            }).collect()
+        }).collect::<Vec<Vec<f32>>>();
+
+        let weights = vec![1; NUM_SUBGAMES];
+
+        b.iter(|| {
+            test::black_box(merge_subgame_results(&mut result, &weights, &subgame_results));
+        });
+    }
 
     #[test]
     fn test_correct_turn_cards_amount() {

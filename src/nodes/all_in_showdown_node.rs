@@ -1,3 +1,4 @@
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use super::node::CfrNode;
 use crate::nodes::node::NodeResult;
 use crate::{
@@ -54,46 +55,57 @@ impl AllInShowdownNode {
         let hands = traversal.get_range_for_active_player(board);
 
         if self.street == 1 {
-            for turn in 0..52 {
-                if !check_card_overlap(turn, board) {
-                    let mut next_board = *board;
-                    next_board[3] = turn;
-
-                    let turn_probs = traversal.get_next_reach_probs(&next_board, op_reach_probs);
-                    let mut turn_utility = vec![0.0; turn_probs.len()];
-                    for river in (turn + 1)..52 {
-                        if !check_card_overlap(river, &next_board) {
-                            next_board[4] = river;
-                            let river_probs =
-                                traversal.get_next_reach_probs(&next_board, &turn_probs);
-                            let river_hands = traversal.get_range_for_active_player(&next_board);
-                            let river_utility =
-                                showdown(river_hands, &river_probs, self.win_utility);
-                            traversal.map_utility_backwards(
-                                &next_board,
-                                &river_utility,
-                                &mut turn_utility,
-                            );
-                        }
-                    }
-                    next_board[4] = 52;
-                    let turn_hands = traversal.get_range_for_active_player(&next_board);
-
-                    turn_utility
-                        .iter_mut()
-                        .zip(turn_hands.iter())
-                        .for_each(|(util, hand)| {
-                            if hand.weight != 0 {
-                                *util /= f32::from(hand.weight);
-                            }
-                        });
-
-                    traversal.merge_canonical_utilities(&next_board, &mut turn_utility);
-
-                    next_board[4] = 52;
-                    traversal.map_utility_backwards(&next_board, &turn_utility, &mut utility)
+            let results: Vec<Option<(Board, Vec<f32>)>> = (0u8..52).into_par_iter().map(|turn| {
+                if check_card_overlap(turn, board) {
+                    return None;
                 }
-            }
+
+                let mut next_board = *board;
+                next_board[3] = turn;
+
+                let turn_probs = traversal.get_next_reach_probs(&next_board, op_reach_probs);
+                let mut turn_utility = vec![0.0; turn_probs.len()];
+                for river in (turn + 1)..52 {
+                    if !check_card_overlap(river, &next_board) {
+                        next_board[4] = river;
+                        let river_probs =
+                            traversal.get_next_reach_probs(&next_board, &turn_probs);
+                        let river_hands = traversal.get_range_for_active_player(&next_board);
+                        let river_utility =
+                            showdown(river_hands, &river_probs, self.win_utility);
+                        traversal.map_utility_backwards(
+                            &next_board,
+                            &river_utility,
+                            &mut turn_utility,
+                        );
+                    }
+                }
+                next_board[4] = 52;
+                let turn_hands = traversal.get_range_for_active_player(&next_board);
+
+                turn_utility
+                    .iter_mut()
+                    .zip(turn_hands.iter())
+                    .for_each(|(util, hand)| {
+                        if hand.weight != 0 {
+                            *util /= f32::from(hand.weight);
+                        }
+                    });
+
+                traversal.merge_canonical_utilities(&next_board, &mut turn_utility);
+
+                next_board[4] = 52;
+                Some((next_board, turn_utility))
+            }).collect();
+
+            results.iter().for_each(|res| {
+                match res {
+                    None => {}
+                    Some((board, turn_result)) => {
+                        traversal.map_utility_backwards(&board, &turn_result, &mut utility);
+                    }
+                }
+            });
             utility
                 .iter_mut()
                 .zip(hands.iter())
@@ -108,7 +120,6 @@ impl AllInShowdownNode {
                     let river_probs = traversal.get_next_reach_probs(&next_board, op_reach_probs);
                     let hands = traversal.get_range_for_opponent(&next_board);
                     let river_utility = showdown(hands, &river_probs, self.win_utility);
-
                     traversal.map_utility_backwards(&next_board, &river_utility, &mut utility);
                 }
             }

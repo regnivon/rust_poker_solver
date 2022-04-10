@@ -8,7 +8,7 @@ WORKDIR /usr/poker-solver
 
 ADD . ./
 
-RUN cargo +nightly build --release
+RUN RUSTFLAGS='-C target-feature=+avx2' cargo +nightly build --release
 
 CMD [ "./target/release/poker-solver" ]
 
