@@ -73,9 +73,6 @@ impl AllInShowdownNode {
                         let river_hands = traversal.get_range_for_active_player(&next_board);
                         let river_utility =
                             showdown(river_hands, &river_probs, self.win_utility);
-                        // let rank_table = traversal.get_rank_table(&next_board);
-                        // let river_utility =
-                        //     jump_showdown(river_hands, rank_table, &river_probs, self.win_utility);
                         traversal.map_utility_backwards(
                             &next_board,
                             &river_utility,
@@ -123,11 +120,6 @@ impl AllInShowdownNode {
                     let river_probs = traversal.get_next_reach_probs(&next_board, op_reach_probs);
                     let hands = traversal.get_range_for_opponent(&next_board);
                     let river_utility = showdown(hands, &river_probs, self.win_utility);
-
-                    // let rank_table = traversal.get_rank_table(&next_board);
-                    // let river_utility =
-                    //     jump_showdown(hands, rank_table, &river_probs, self.win_utility);
-
                     traversal.map_utility_backwards(&next_board, &river_utility, &mut utility);
                 }
             }

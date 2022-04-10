@@ -111,11 +111,4 @@ impl Traversal {
         }
         self.ip_rm.merge_canonical_utilities(board, utility)
     }
-
-    pub fn get_rank_table(&self, board: &Board) -> &[usize] {
-        if self.traverser == 1 {
-            return self.oop_rm.get_rank_table_for_board(board);
-        }
-        self.ip_rm.get_rank_table_for_board(board)
-    }
 }

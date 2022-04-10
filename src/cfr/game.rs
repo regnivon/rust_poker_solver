@@ -14,6 +14,13 @@ use cloud_storage::Client;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 use crate::cfr::traversal::build_traversal_from_ranges;
+use crate::nodes::node::Node::{
+    ShowdownNode as OtherShowdownNode,
+    ActionNode as OtherActionNode,
+    ChanceNode as OtherChanceNode,
+    AllInShowdownNode as OtherAllInShowdownNode,
+    TerminalNode as OtherTerminalNode
+};
 
 pub async fn run_trainer(
     board: Board,
@@ -26,7 +33,7 @@ pub async fn run_trainer(
 
     let mut game = Game::new(traversal, params, board);
 
-    game.train(0.5);
+    game.train(0.35);
     let file_name = format!(
         "{}{}{}.json",
         number_to_card(board[0]),
@@ -60,7 +67,7 @@ impl Game {
         Self {
             traversal,
             game_params,
-            root: Node::from(ShowdownNode::new(0.0)),
+            root: OtherShowdownNode(ShowdownNode::new(0.0)),
             starting_board,
         }
     }
@@ -83,7 +90,7 @@ impl Game {
 
         let mut iterations = 0;
         loop {
-            if iterations % 15 == 0 {
+            if iterations % 25 == 0 {
                 self.traversal.traverser = 0;
                 let oop_br = self.overall_best_response(&oop_relative_probs, &ip);
                 self.traversal.traverser = 1;
@@ -134,9 +141,6 @@ impl Game {
                 .best_response(&self.traversal, opp_reach_probs, &self.starting_board);
 
         let mut sum = 0.0;
-        //
-        // let q: f32 = evs.iter().sum();
-        // info!("{}", q);
         for i in 0..evs.len() {
             sum += evs[i] * responder_relative_probs[i] / unblocked[i];
         }
@@ -157,7 +161,7 @@ impl Game {
 
         self.add_successor_nodes(&mut root, 0, &board);
 
-        self.root = Node::from(root);
+        self.root = OtherActionNode(root);
     }
 
     fn add_successor_nodes(&mut self, root: &mut ActionNode, bet_number: u8, board: &Board) {
@@ -193,10 +197,10 @@ impl Game {
 
         if street == 3 {
             let next = ShowdownNode::new(root.pot_size + last_bet_size);
-            root.add_child(Node::from(next));
+            root.add_child(OtherShowdownNode(next));
         } else if call_stacks == 0.0 {
             let next = AllInShowdownNode::new(root.pot_size + last_bet_size, street);
-            root.add_child(Node::from(next));
+            root.add_child(OtherAllInShowdownNode(next));
         } else {
             let mut next = if self.game_params.parallel_street == street {
                 ChanceNode::new(board, street, true)
@@ -223,15 +227,15 @@ impl Game {
                 );
 
                 self.add_successor_nodes(&mut next_game_node, 0, &new_board);
-                next.add_next_node(Node::from(next_game_node));
+                next.add_next_node(OtherActionNode(next_game_node));
             }
 
-            root.add_child(Node::from(next));
+            root.add_child(OtherChanceNode(next));
         }
 
         if bet_number > 0 {
             let fold = TerminalNode::new(root.pot_size - last_bet_size, root.player_node ^ 1);
-            root.add_child(Node::from(fold));
+            root.add_child(OtherTerminalNode(fold));
         }
     }
 
@@ -252,7 +256,7 @@ impl Game {
 
         self.add_successor_nodes(&mut next, 0, board);
 
-        root.add_child(Node::from(next));
+        root.add_child(OtherActionNode(next));
     }
 
     fn create_next_bet_nodes(
@@ -290,7 +294,7 @@ impl Game {
                 );
 
                 self.add_successor_nodes(&mut next, bet_number + 1, board);
-                root.add_child(Node::from(next));
+                root.add_child(OtherActionNode(next));
                 if final_bet_size < sizing {
                     break;
                 }
@@ -305,7 +309,7 @@ impl Game {
                 );
 
                 self.add_successor_nodes(&mut next, bet_number + 1, board);
-                root.add_child(Node::from(next));
+                root.add_child(OtherActionNode(next));
                 if final_bet_size < sizing {
                     break;
                 }

@@ -1,6 +1,4 @@
-use std::arch::aarch64::{vaddq_f32, vld1q_dup_f32, vld1q_f32, vmlaq_f32, vmulq_f32, vst1q_f32};
 use std::borrow::Borrow;
-use std::intrinsics::prefetch_read_data;
 use crate::nodes::node::{CfrNode, Node, NodeResult, NodeResultType};
 use crate::{
     cfr::traversal::Traversal,
@@ -225,48 +223,6 @@ fn merge_subgame_results(result: &mut [f32], weights: &[i8], sub_results: &[Vec<
     }
 }
 
-//9200
-#[cfg(all(target_arch = "aarch64"))]
-#[target_feature(enable = "neon")]
-unsafe fn merge_subgame_results_neon_optimized(result: &mut [f32], weights: &[i8], sub_results: &[Vec<f32>]) {
-    let num_hands = result.len();
-    let left_over = num_hands % 4;
-    let simd_stop_index = num_hands - left_over;
-
-
-    for subgame in (0..sub_results.len()).step_by(2) {
-        let subgame_result0 = &sub_results[subgame];
-        let subgame_result1 = &sub_results[subgame + 1];
-        let runout_weight0 = f32::from(weights[subgame]);
-        let runout_weight1 = f32::from(weights[subgame + 1]);
-        let weight_vec0 = vld1q_dup_f32(runout_weight0.borrow());
-        let weight_vec1 = vld1q_dup_f32(runout_weight1.borrow());
-
-        for hand in (0..simd_stop_index).step_by(4) {
-            let rv0 = vld1q_f32(subgame_result0.get_unchecked(hand));
-            let rv1 = vld1q_f32(subgame_result1.get_unchecked(hand));
-            let r0 = vmulq_f32(
-                rv0,
-                weight_vec0,
-            );
-            let r1 = vmulq_f32(
-                rv1,
-                weight_vec1,
-            );
-
-            vst1q_f32(
-                result.get_unchecked_mut(hand),
-                vaddq_f32(r0, r1),
-            );
-        }
-        //
-        //
-        // for hand in simd_stop_index..num_hands {
-        //     result[hand] += runout[hand] * runout_weight;
-        // }
-    }
-}
-
 pub fn build_next(board: &Board, next_cards: &mut Vec<u8>, next_weights: &mut Vec<i8>) {
     let suit_groups = if board_has_turn(board) {
         let flop_groups = build_initial_suit_groups(&[board[0], board[1], board[2], 52, 52]);
@@ -332,30 +288,6 @@ mod tests {
             test::black_box(merge_subgame_results(&mut result, &weights, &subgame_results));
         });
     }
-
-    #[cfg(all(target_arch = "aarch64"))]
-    #[bench]
-    fn neon_subgame_merge(b: &mut Bencher) {
-        let mut result = vec![0.0; NUM_HANDS];
-
-        let subgame_results = (0..NUM_SUBGAMES).map(|_| {
-            (0..NUM_HANDS).map(|_| {
-                let r: f32 = random();
-                if r < 0.5 {
-                    -100.0 * r
-                } else {
-                    r * 100.0
-                }
-            }).collect()
-        }).collect::<Vec<Vec<f32>>>();
-
-        let weights = vec![1; NUM_SUBGAMES];
-
-        b.iter(|| {
-            test::black_box(unsafe { merge_subgame_results_neon_optimized(&mut result, &weights, &subgame_results) });
-        });
-    }
-
 
     #[test]
     fn test_correct_turn_cards_amount() {

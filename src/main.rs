@@ -17,13 +17,12 @@ static GLOBAL: Jemalloc = Jemalloc;
 extern crate rayon;
 
 use std::error::Error;
+use rust_poker::equity_calculator::exact_equity;
 use crate::{
     cfr::{game_params::GameParams, game::run_trainer},
     ranges::{
         combination::Board,
-        utility::{
-            card_to_number
-        },
+        utility::card_to_number,
     },
 };
 use tracing::info;
@@ -33,9 +32,9 @@ use crate::messaging::run_consumer;
 async fn main() -> Result<(), Box<dyn Error>> {
     tracing_subscriber::fmt::init();
     let board: Board = [
-        card_to_number("kc".to_string()),
-        card_to_number("7h".to_string()),
-        card_to_number("2d".to_string()),
+        card_to_number("qs".to_string()),
+        card_to_number("jh".to_string()),
+        card_to_number("2h".to_string()),
         52,
         52,
     ];
@@ -46,14 +45,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         1,
         60.0,
         1000.0,
-        20.0,
+        1.0,
         0.75,
-        vec![vec![0.75]],
-        vec![vec![0.75]],
-        vec![vec![0.75]],
-        vec![vec![0.75]],
-        vec![vec![0.75]],
-        vec![vec![0.75]],
+        vec![vec![]],
+        vec![vec![0.75, 1.5]],
+        vec![vec![0.75, 1.5]],
+        vec![vec![0.33]],
+        vec![vec![0.75, 1.5]],
+        vec![vec![0.75, 1.5]],
     );
     // AKs@0,AQs@0,AJs@0,ATs@0,A9s@0,A8s@0,A7s@0,A6s@0,A5s@0,A4s@0,A3s@0,A2s@0
 //AA,KK,QQ,JJ,TT,99,88,77,66,55,44,33,22,A2s+,K2s+,Q2s+,JTs,J9s,J8s,J7s,T9s,T8s,T7s,T6s,98s,97s,96s,87s,86s,76s,65s,A5o+,KTo+,QTo+

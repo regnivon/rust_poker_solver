@@ -29,21 +29,6 @@ fn get_key(board: &Board) -> u64 {
     }
 }
 
-fn build_rank_table_for_hands(hands: &Vec<Combination>) -> Vec<usize> {
-    let mut table = vec![0; 0];
-
-    let mut i = 0;
-    while i < hands.len() {
-        let mut j = i + 1;
-        while j < hands.len() && hands[j].rank == hands[i].rank {
-            j += 1;
-        }
-        table.push(j);
-        i = j;
-    }
-    table
-}
-
 #[enum_dispatch]
 pub trait RangeManager {
     fn merge_canonical_utilities(&self, board: &Board, utility: &mut Vec<f32>);
@@ -57,7 +42,6 @@ pub trait RangeManager {
     fn get_range_for_board(&self, board: &Board) -> &Vec<Combination>;
     fn get_reach_probs_mapping(&self, board: &Board) -> &Vec<usize>;
     fn get_starting_combinations(&self) -> Vec<Combination>;
-    fn get_rank_table_for_board(&self, board: &Board) -> &[usize];
 }
 
 #[enum_dispatch(RangeManager)]
@@ -304,7 +288,6 @@ impl IsomorphicRangeManager {
                 self.reach_probs_mapping
                     .insert(river_board_key, river_reach_probs_mapping);
 
-                self.add_jump_table_for_board(build_rank_table_for_hands(&river_hands), &river_board);
                 self.add_range_for_board(river_hands, river_board_key);
             }
 
@@ -364,7 +347,6 @@ impl IsomorphicRangeManager {
             self.reach_probs_mapping
                 .insert(river_board_key, river_reach_probs_mapping);
 
-            self.add_jump_table_for_board(build_rank_table_for_hands(&river_hands), &river_board);
             self.add_range_for_board(river_hands, river_board_key);
         }
     }
@@ -396,16 +378,11 @@ impl IsomorphicRangeManager {
 
         river_hands.sort_by_key(|k| k.rank);
 
-        self.add_jump_table_for_board(build_rank_table_for_hands(&river_hands), &initial_board);
         self.add_range_for_board(river_hands, river_board_key);
     }
 
     fn add_range_for_board(&mut self, range: Vec<Combination>, board_key: u64) {
         self.ranges.insert(board_key, range);
-    }
-
-    fn add_jump_table_for_board(&mut self, table: Vec<usize>, board: &Board) {
-        self.rank_tables.insert(get_key(board), table);
     }
 }
 
@@ -484,10 +461,6 @@ impl RangeManager for IsomorphicRangeManager {
 
     fn get_starting_combinations(&self) -> Vec<Combination> {
         self.starting_combinations.clone()
-    }
-
-    fn get_rank_table_for_board(&self, board: &Board) -> &[usize] {
-        &self.rank_tables[&get_key(board)]
     }
 }
 
@@ -626,7 +599,6 @@ impl DefaultRangeManager {
                 self.reach_probs_mapping
                     .insert(river_board_key, river_reach_probs_mapping);
 
-                self.add_jump_table_for_board(build_rank_table_for_hands(&river_hands), &river_board);
                 self.add_range_for_board(river_hands, river_board_key);
             }
 
@@ -686,7 +658,6 @@ impl DefaultRangeManager {
             self.reach_probs_mapping
                 .insert(river_board_key, river_reach_probs_mapping);
 
-            self.add_jump_table_for_board(build_rank_table_for_hands(&river_hands), &river_board);
             self.add_range_for_board(river_hands, river_board_key);
         }
     }
@@ -718,16 +689,11 @@ impl DefaultRangeManager {
 
         river_hands.sort_by_key(|k| k.rank);
 
-        self.add_jump_table_for_board(build_rank_table_for_hands(&river_hands), &initial_board);
         self.add_range_for_board(river_hands, river_board_key);
     }
 
     fn add_range_for_board(&mut self, range: Vec<Combination>, board_key: u64) {
         self.ranges.insert(board_key, range);
-    }
-
-    fn add_jump_table_for_board(&mut self, table: Vec<usize>, board: &Board) {
-        self.rank_tables.insert(get_key(board), table);
     }
 }
 
@@ -777,10 +743,6 @@ impl RangeManager for DefaultRangeManager {
 
     fn get_starting_combinations(&self) -> Vec<Combination> {
         self.starting_combinations.clone()
-    }
-
-    fn get_rank_table_for_board(&self, board: &Board) -> &[usize] {
-        &self.rank_tables[&get_key(board)]
     }
 }
 
