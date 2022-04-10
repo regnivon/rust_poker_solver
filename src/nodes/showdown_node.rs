@@ -9,8 +9,6 @@ pub struct ShowdownNode {
     win_utility: f32,
 }
 
-const NUM_CARDS: usize = 52;
-
 impl CfrNode for ShowdownNode {
     fn cfr_traversal(
         &mut self,

@@ -1,4 +1,3 @@
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator};
 use crate::{
     cfr::traversal::Traversal,
     ranges::combination::{Board, Combination},

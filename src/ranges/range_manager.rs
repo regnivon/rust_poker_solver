@@ -54,7 +54,6 @@ pub struct IsomorphicRangeManager {
     starting_combinations: Vec<Combination>,
     ranges: HashMap<u64, Vec<Combination>>,
     reach_probs_mapping: HashMap<u64, Vec<usize>>,
-    rank_tables: HashMap<u64, Vec<usize>>,
     flop_indexer: HandIndexer,
     turn_indexer: HandIndexer,
     river_indexer: HandIndexer,
@@ -67,7 +66,6 @@ impl IsomorphicRangeManager {
             starting_combinations,
             ranges: HashMap::new(),
             reach_probs_mapping: HashMap::new(),
-            rank_tables: HashMap::new(),
             flop_indexer: HandIndexer::init(2, [2, 3].to_vec()),
             turn_indexer: HandIndexer::init(3, [2, 3, 1].to_vec()),
             river_indexer: HandIndexer::init(4, [2, 3, 1, 1].to_vec()),
@@ -469,7 +467,6 @@ pub struct DefaultRangeManager {
     starting_combinations: Vec<Combination>,
     ranges: HashMap<u64, Vec<Combination>>,
     reach_probs_mapping: HashMap<u64, Vec<usize>>,
-    rank_tables: HashMap<u64, Vec<usize>>,
 }
 
 // TODO: Track where my hand is in opponents range for terminal eval
@@ -479,7 +476,6 @@ impl DefaultRangeManager {
             starting_combinations,
             ranges: HashMap::new(),
             reach_probs_mapping: HashMap::new(),
-            rank_tables: HashMap::new(),
         };
 
         rm.init(&initial_board);

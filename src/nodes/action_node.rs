@@ -841,7 +841,7 @@ impl ActionNode {
             }
             _ => {
                 for hand in (0..simd_stop_index).step_by(4) {
-                    let mut normalizing_vec_ptr = [0.0; 4].as_mut_ptr();
+                    let normalizing_vec_ptr = [0.0; 4].as_mut_ptr();
                     for action in 0..self.num_actions {
                         let regret_with_negatives_zeroed = vmaxq_f32(
                             vld1q_f32(
@@ -885,14 +885,6 @@ impl ActionNode {
         strategy
     }
 }
-
-extern crate test;
-
-use crate::cfr::traversal::build_traversal_from_ranges;
-use crate::ranges::utility::construct_starting_range_from_string;
-use rust_poker::hand_evaluator::{evaluate, Hand, CARDS};
-use test::Bencher;
-use tracing::info;
 
 #[cfg(test)]
 mod tests {

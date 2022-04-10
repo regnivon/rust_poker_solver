@@ -17,7 +17,6 @@ static GLOBAL: Jemalloc = Jemalloc;
 extern crate rayon;
 
 use std::error::Error;
-use rust_poker::equity_calculator::exact_equity;
 use crate::{
     cfr::{game_params::GameParams, game::run_trainer},
     ranges::{
